@@ -1,0 +1,91 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Get company ID helper (direct token check or fallback)
+    function getCompanyId() {
+      return request.auth.token.company_id != null ? 
+             request.auth.token.company_id : 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.company_id;
+    }
+
+    // Get user role helper
+    function getRole() {
+      return request.auth.token.role != null ? 
+             request.auth.token.role : 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'Empleado');
+    }
+
+    function isCEO() {
+      return getRole() == 'CEO' || request.auth.token.email == 'felizdeemprender@gmail.com';
+    }
+
+    function isAdmin() {
+      return getRole() == 'Admin';
+    }
+
+    // --- Collections ---
+
+    // Users: Employees read colleagues. Admins/CEOs manage.
+    match /users/{userId} {
+      // Direct access for self
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Collection read filtered by company
+      allow read: if isAuthenticated() && (
+        isCEO() || 
+        resource.data.company_id == getCompanyId()
+      );
+
+      allow write: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isCEO() || 
+        (isAdmin() && getCompanyId() == (resource != null ? resource.data.company_id : request.resource.data.company_id))
+      );
+
+      match /spirit_history/{historyId} {
+        allow read: if isAuthenticated() && (request.auth.uid == userId || isCEO());
+      }
+    }
+
+    // Companies: Setup mode
+    match /companies/{companyId} {
+      allow read: if isAuthenticated() && (isCEO() || getCompanyId() == companyId);
+      allow update: if isAuthenticated() && (isCEO() || (isAdmin() && getCompanyId() == companyId));
+      allow create: if isAuthenticated(); 
+    }
+
+    // Tasks: Filtered by company.
+    match /tasks/{taskId} {
+      allow read, update: if isAuthenticated() && (isCEO() || getCompanyId() == resource.data.company_id);
+      allow create: if isAuthenticated() && (isCEO() || getCompanyId() == request.resource.data.company_id);
+
+      match /{allSubcollections=**} {
+        allow read, write: if isAuthenticated() && (
+          isCEO() || 
+          getCompanyId() == get(/databases/$(database)/documents/tasks/$(taskId)).data.company_id
+        );
+      }
+    }
+
+    // Polls
+    match /polls/{pollId} {
+      allow read: if isAuthenticated() && (isCEO() || getCompanyId() == resource.data.company_id);
+      allow create, update: if isAuthenticated() && (isCEO() || getCompanyId() == request.resource.data.get('company_id', resource.data.get('company_id', null)));
+    }
+
+    // Notifications: Owner only for read/delete.
+    match /notifications/{notificationId} {
+      allow read, update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isCEO()
+      );
+      allow create: if isAuthenticated();
+    }
+  }
+}
