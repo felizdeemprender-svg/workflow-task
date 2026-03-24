@@ -64,8 +64,8 @@ export const Button = ({
             whileTap={isClickable ? { scale: 0.98 } : {}}
             transition={{ type: "spring", stiffness: 500, damping: 25 }}
             disabled={!isClickable}
-            style={{ ...inlineStyles, ...getVariantStyles() }}
-            {...(filteredProps as any)}
+            style={{ ...inlineStyles, ...getVariantStyles(), ...props.style }}
+            {...filteredProps}
         >
             {isLoading && (
                 <span className="animate-spin" style={{ marginRight: '8px', display: 'inline-block' }}>◌</span>
