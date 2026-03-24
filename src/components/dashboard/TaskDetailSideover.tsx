@@ -269,11 +269,11 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
 
                         <div style={{ 
                             flex: 1, 
-                            overflowY: 'auto', 
+                            overflowY: activeTab === 'chat' ? 'hidden' : 'auto', 
                             display: 'flex', 
                             flexDirection: 'column', 
-                            gap: '1.5rem',
-                            paddingRight: '0.5rem'
+                            gap: activeTab === 'chat' ? '0' : '1.5rem',
+                            paddingRight: activeTab === 'chat' ? '0' : '0.5rem'
                         }} className="custom-scrollbar">
                             {!editedTask ? (
                                 <div className="flex-row justify-center items-center py-20">
@@ -511,8 +511,8 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
                                         <motion.div 
                                             initial={{ opacity: 0, x: 20 }}
                                             animate={{ opacity: 1, x: 0 }}
-                                            className="flex-col gap-3" 
-                                            style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minHeight: '500px' }}
+                                            className="flex-col" 
+                                            style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}
                                         >
                                             <div style={{ 
                                                 flex: 1, 
