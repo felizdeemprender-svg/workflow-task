@@ -7,7 +7,8 @@ import {
     Plus, Filter, Loader2, Database, Users, Clock, 
     MoreVertical, RefreshCw, UserCheck, Hammer, 
     CheckCheck, Circle, Wrench, Timer, Play, 
-    ChevronDown, X, MessageSquare, Square, Folder, Search 
+    ChevronDown, X, MessageSquare, Square, Folder, Search,
+    Paperclip 
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +22,7 @@ import { toast } from "sonner";
 import { TaskDetailSideover } from "@/components/dashboard/TaskDetailSideover";
 
 export default function TasksPage() {
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
     const { user } = useAuth();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,6 +38,7 @@ export default function TasksPage() {
         status: "Pendiente",
         dueDate: new Date().toISOString().split('T')[0],
         assignedEmail: "",
+        attachments: [] as any[],
         recurrence: {
             frequency: "None",
             startDate: new Date().toISOString().split('T')[0],
@@ -50,11 +53,16 @@ export default function TasksPage() {
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
         const newStatus = destination.droppableId;
+        const oldStatus = source.droppableId;
         const taskId = draggableId;
 
         try {
             toast.promise(
-                taskActions.updateTask(taskId, { status: newStatus }),
+                taskActions.updateTask(taskId, { status: newStatus }, {
+                    action: 'CAMBIO DE ESTADO',
+                    user: user?.email || 'Sistema',
+                    details: `${oldStatus} -> ${newStatus} (Arrastre)`
+                }),
                 {
                     loading: 'Actualizando estado...',
                     success: 'Estado actualizado correctamente',
@@ -134,6 +142,7 @@ export default function TasksPage() {
                 status: "Pendiente",
                 dueDate: new Date().toISOString().split('T')[0],
                 assignedEmail: "",
+                attachments: [],
                 recurrence: {
                     frequency: "None",
                     startDate: new Date().toISOString().split('T')[0],
@@ -151,81 +160,161 @@ export default function TasksPage() {
 
     return (
         <div className="flex-col gap-4 fade-in">
-            {/* Creator Card */}
-            <div className="card p-4 sm:p-5 flex-col gap-5 w-full overflow-hidden" style={{ boxShadow: 'var(--shadow-premium)', border: 'none' }}>
-                <div className="flex-col gap-4">
-                    <input
-                        type="text"
-                        placeholder="¿Qué hay que hacer?"
-                        className="text-main placeholder-muted w-full"
-                        style={{ background: 'transparent', border: 'none', outline: 'none', boxShadow: 'none', fontSize: 'min(1.5rem, 6vw)', fontWeight: '500' }}
-                        value={newTask.title}
-                        onChange={e => setNewTask({ ...newTask, title: e.target.value })}
-                    />
-                    <textarea
-                        placeholder="Añadir descripción..."
-                        className="text-muted resize-none w-full"
-                        style={{ background: 'transparent', border: 'none', outline: 'none', boxShadow: 'none', fontSize: '0.95rem', opacity: 0.6 }}
-                        rows={1}
-                        value={newTask.description}
-                        onChange={e => setNewTask({ ...newTask, description: e.target.value })}
-                    />
-                </div>
-
-                <div className="flex-col gap-4" style={{ width: '100%', overflow: 'hidden' }}>
-                    <div className="flex-row gap-2 flex-wrap" style={{ width: '100%' }}>
-                        {availableAreas.filter(a => a !== "Todas").map(area => {
-                            const isSelected = newTask.area === area;
-                            const areaColors: any = { "Administración": "#00ffff", "Ventas": "#ef4444", "Logística": "#f59e0b", "Soporte": "#10b981" };
-                            const color = areaColors[area] || "#6366f1";
-                            return (
-                                <button 
-                                    key={area}
-                                    onClick={() => setNewTask({ ...newTask, area })}
-                                    className="pill"
-                                    style={{ 
-                                        background: isSelected ? color : 'var(--bg-main)', 
-                                        color: isSelected ? 'white' : 'var(--text-muted)',
-                                        border: '1px solid var(--border-light)',
-                                        padding: '0.2rem 0.6rem',
-                                        fontSize: '0.65rem'
-                                    }}
-                                >
-                                    {area}
-                                </button>
-                            );
-                        })}
+            <div className="card p-4 sm:p-5 pr-1 sm:pr-1 flex-row gap-4 w-full" style={{ boxShadow: 'var(--shadow-premium)', border: 'none', alignItems: 'center' }}>
+                <div className="flex-col gap-4 flex-1 min-w-0">
+                    <div className="flex-col gap-3">
+                        <input
+                            type="text"
+                            placeholder="¿Qué hay que hacer?"
+                            className="text-main placeholder-muted w-full"
+                            style={{ background: 'transparent', border: 'none', outline: 'none', boxShadow: 'none', fontSize: 'min(1.4rem, 5.5vw)', fontWeight: '500' }}
+                            value={newTask.title}
+                            onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+                        />
+                        <textarea
+                            placeholder="Añadir descripción..."
+                            className="text-muted resize-none w-full"
+                            style={{ background: 'transparent', border: 'none', outline: 'none', boxShadow: 'none', fontSize: '0.9rem', opacity: 0.6 }}
+                            rows={1}
+                            value={newTask.description}
+                            onChange={e => setNewTask({ ...newTask, description: e.target.value })}
+                        />
                     </div>
-                    
-                    <div className="flex-col gap-3" style={{ width: '100%' }}>
-                        <div className="flex-row gap-x-2 gap-y-1 text-muted font-bold flex-wrap" style={{ opacity: 0.8, fontSize: '0.65rem', minWidth: 0, width: '100%' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}><Database size={10} /> Adjuntar</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}><Clock size={10} /> Fecha</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                                <RefreshCw size={10} /> <span>Recurrencia</span>
+
+                    <div className="flex-row items-center" style={{ width: '100%', gap: '1rem' }}>
+                        <div className="flex-col gap-1.5">
+                            <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', marginLeft: '2px' }}>Área</span>
+                            <select 
+                                value={newTask.area} 
+                                onChange={e => setNewTask({ ...newTask, area: e.target.value })}
+                                style={{ 
+                                    padding: '0.4rem 2rem 0.4rem 0.8rem', 
+                                    fontSize: '0.8rem', 
+                                    fontWeight: 600,
+                                    width: 'auto', 
+                                    minWidth: '140px',
+                                    background: 'var(--bg-main)',
+                                    borderRadius: '10px',
+                                    border: '1px solid var(--border-light)',
+                                    color: 'var(--text-main)',
+                                    appearance: 'none',
+                                    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\' stroke-width=\'3\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")',
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'right 0.6rem center',
+                                    backgroundSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    outline: 'none'
+                                }}
+                            >
+                                {availableAreas.filter(a => a !== "Todas").map(area => (
+                                    <option key={area} value={area}>{area}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                        
+                        <div className="flex-row text-muted font-bold flex-wrap items-center" style={{ opacity: 0.8, fontSize: '0.75rem', minWidth: 0, width: '100%', marginTop: '0.5rem', columnGap: '1.25rem', rowGap: '0.5rem' }}>
+                            <div 
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                                className="hover-primary-text"
+                            >
+                                <Paperclip size={12} className={newTask.attachments.length > 0 ? "text-primary" : ""} /> 
+                                <span style={{ color: newTask.attachments.length > 0 ? 'var(--primary)' : 'inherit' }}>
+                                    {newTask.attachments.length > 0 ? `${newTask.attachments.length} Archivo(s)` : "Adjuntar"}
+                                </span>
+                                <input 
+                                    ref={fileInputRef}
+                                    type="file" 
+                                    multiple
+                                    style={{ display: 'none' }} 
+                                    onChange={(e) => {
+                                        if (e.target.files) {
+                                            const newFiles = Array.from(e.target.files).map(f => ({
+                                                name: f.name,
+                                                size: f.size,
+                                                type: f.type,
+                                                lastModified: f.lastModified,
+                                                uploadedAt: new Date().toISOString()
+                                            }));
+                                            setNewTask({ ...newTask, attachments: [...newTask.attachments, ...newFiles] });
+                                            toast.success(`${newFiles.length} archivo(s) preparados`);
+                                        }
+                                    }} 
+                                />
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                                <Filter size={10} /> <span>{newTask.priority}</span>
+                            <div 
+                                style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer', position: 'relative' }}
+                                className="hover-primary-text"
+                            >
+                                <Clock size={12} /> 
+                                <span onClick={() => (document.getElementById('task-date-input') as any)?.showPicker?.() || document.getElementById('task-date-input')?.focus()}>
+                                    {newTask.dueDate || "Fecha"}
+                                </span>
+                                <input 
+                                    id="task-date-input" 
+                                    type="date" 
+                                    style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0 }} 
+                                    value={newTask.dueDate} 
+                                    onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })} 
+                                />
+                            </div>
+                            <div 
+                                onClick={() => {
+                                    const next: any = { "None": "Daily", "Daily": "Weekly", "Weekly": "Monthly", "Monthly": "None" };
+                                    setNewTask({ ...newTask, recurrence: { ...newTask.recurrence, frequency: next[newTask.recurrence.frequency] || "None" } });
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                                className="hover-primary-text"
+                            >
+                                <RefreshCw size={12} className={newTask.recurrence.frequency !== "None" ? "text-primary" : ""} /> 
+                                <span style={{ color: newTask.recurrence.frequency !== "None" ? 'var(--primary)' : 'inherit' }}>
+                                    {newTask.recurrence.frequency === "None" ? "Recurrencia" : newTask.recurrence.frequency}
+                                </span>
+                            </div>
+                            <div 
+                                onClick={() => {
+                                    const next: any = { "Baja": "Media", "Media": "Alta", "Alta": "Baja" };
+                                    setNewTask({ ...newTask, priority: next[newTask.priority] || "Media" });
+                                }}
+                                style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                                className="hover-primary-text"
+                            >
+                                <Filter size={12} /> <span>{newTask.priority}</span>
                             </div>
                         </div>
-
-                        <button 
-                            onClick={handleCreateTask}
-                            className="pill text-white font-bold"
-                            style={{ 
-                                background: '#6366f1', 
-                                fontSize: '0.75rem', 
-                                width: 'fit-content',
-                                alignSelf: 'center',
-                                padding: '6px 24px',
-                                border: 'none',
-                                color: 'white'
-                            }}
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting ? "Creando..." : "Crear Tarea"}
-                        </button>
                     </div>
+
+                <div className="flex-col justify-center shrink-0 pr-1">
+                    <button 
+                        onClick={handleCreateTask}
+                        className="flex items-center justify-center text-white p-0 shadow-lg"
+                        style={{ 
+                            background: 'var(--primary)', 
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        }}
+                        disabled={isSubmitting}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.1) rotate(90deg)';
+                            e.currentTarget.style.boxShadow = '0 6px 16px rgba(99, 102, 241, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.3)';
+                        }}
+                    >
+                        {isSubmitting ? (
+                            <Loader2 size={18} className="animate-spin text-white" />
+                        ) : (
+                            <Plus size={24} strokeWidth={2.5} className="text-white" />
+                        )}
+                    </button>
                 </div>
             </div>
 
@@ -323,7 +412,7 @@ export default function TasksPage() {
                                     <div 
                                         onClick={() => toggleSection(col.label)}
                                         className="flex-row justify-between items-center px-2 group cursor-pointer" 
-                                        style={{ borderBottom: `2px solid ${col.color}`, paddingBottom: '0.6rem' }}
+                                        style={{ borderBottom: '2px solid var(--bg-sidebar)', paddingBottom: '0.6rem' }}
                                     >
                                         <h3 className="flex-row gap-2 items-center text-main font-extrabold" style={{ fontSize: '0.90rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                             <ChevronDown 
@@ -386,7 +475,7 @@ export default function TasksPage() {
                                                                         }}
                                                                     >
                                                                         <div className={`card overflow-hidden ${snapshot.isDragging ? 'shadow-2xl' : 'shadow-sm'}`} style={{ 
-                                                                            borderLeft: `6px solid ${priorityColor}`, 
+                                                                            borderLeft: 'none', 
                                                                             padding: '1rem',
                                                                             background: 'var(--bg-card)',
                                                                             minWidth: 0,
@@ -394,14 +483,16 @@ export default function TasksPage() {
                                                                             transition: 'all 0.2s',
                                                                             backgroundColor: snapshot.isDragging ? 'var(--primary-light)' : 'var(--bg-card)'
                                                                         }}>
-                                                                            <div className="flex-col gap-3">
-                                                                                <div className="flex-row justify-between items-start gap-2">
-                                                                                    <h4 className="font-bold text-main" style={{ 
-                                                                                        fontSize: '0.85rem', 
-                                                                                        lineHeight: '1.3', 
-                                                                                        flex: 1,
-                                                                                        minWidth: 0
-                                                                                    }}>{task.title}</h4>
+                                                                            <div className="flex-col" style={{ gap: '0.75rem' }}>
+                                                                                <div className="flex-row justify-between items-start" style={{ gap: '0.4rem' }}>
+                                                                                    <div className="flex-row items-start flex-1 min-w-0" style={{ gap: '0.75rem' }}>
+                                                                                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: priorityColor, flexShrink: 0, marginTop: '5px' }} />
+                                                                                        <h4 className="font-bold text-main" style={{ 
+                                                                                            fontSize: '0.85rem', 
+                                                                                            lineHeight: '1.3', 
+                                                                                            minWidth: 0
+                                                                                        }}>{task.title}</h4>
+                                                                                    </div>
                                                                                     <div className="pill" style={{ 
                                                                                         background: `${areaColor}15`, 
                                                                                         color: areaColor, 
@@ -415,12 +506,16 @@ export default function TasksPage() {
                                                                                 </div>
 
                                                                                 <div className="flex-row justify-between items-center opacity-60">
-                                                                                    <div className="flex-row gap-1.5 items-center text-muted" style={{ fontSize: '0.65rem' }}>
-                                                                                        <Users size={12} />
-                                                                                        <span>{companyUsers?.find((u: any) => u.email === task.assignedEmail)?.name || "Sin asignar"}</span>
-                                                                                    </div>
+                                                                                    {task.assignedEmail ? (
+                                                                                        <div className="flex-row gap-1.5 items-center text-muted" style={{ fontSize: '0.65rem' }}>
+                                                                                            <Users size={12} />
+                                                                                            <span>{companyUsers?.find((u: any) => u.email === task.assignedEmail)?.name || task.assignedEmail}</span>
+                                                                                        </div>
+                                                                                    ) : <div />}
                                                                                     <div className="flex-row gap-2">
-                                                                                        <MessageSquare size={13} className="text-muted" />
+                                                                                        {(task.messageCount || 0) > 0 && (
+                                                                                            <MessageSquare size={13} className="text-muted" />
+                                                                                        )}
                                                                                     </div>
                                                                                 </div>
                                                                             </div>

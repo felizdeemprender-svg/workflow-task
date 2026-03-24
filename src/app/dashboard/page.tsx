@@ -178,7 +178,7 @@ export default function DashboardPage() {
                                     </Link>
                                 ))}
                                 <Link href="/dashboard/tasks" style={{ width: '100%' }}>
-                                    <Button variant="ghost" style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.75rem' }}>Ver todo</Button>
+                                    <Button variant="secondary" style={{ width: '100%', marginTop: '0.5rem' }}>Ver todo</Button>
                                 </Link>
                             </div>
                         )}

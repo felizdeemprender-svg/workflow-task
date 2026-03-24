@@ -119,37 +119,6 @@ export const Sidebar = () => {
                     {isSidebarCollapsed ? <Menu size={isSidebarCollapsed ? 16 : 18} /> : <ChevronLeft size={18} />}
                 </button>
 
-                    
-                    <button
-                        onClick={() => useUI().toggleDarkMode()}
-                        style={{
-                            background: 'rgba(255,255,255,0.03)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'rgba(255,255,255,0.6)',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '12px',
-                            transition: 'all 0.2s'
-                        }}
-                        className="hover-bg-sidebar"
-                        title={useUI().isDarkMode ? "Modo Claro" : "Modo Oscuro"}
-                    >
-                        {useUI().isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-                    </button>
-                    
-                    <style jsx>{`
-                        .hover-bg-sidebar:hover { 
-                            background-color: rgba(255,255,255,0.1) !important; 
-                            color: white !important;
-                        }
-                        .sidebar-util-btn:hover {
-                            background-color: rgba(255,255,255,0.05);
-                        }
-                    `}</style>
                 </div>
 
             <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>

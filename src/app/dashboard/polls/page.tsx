@@ -86,11 +86,9 @@ export default function PollsPage() {
                     <h1>Encuestas</h1>
                     <p className="text-muted">Participa en las decisiones del equipo de forma democrática.</p>
                 </div>
-                {(user?.role === 'CEO' || user?.role === 'Admin') && (
-                    <Button variant="primary" onClick={() => setIsModalOpen(true)}>
-                        <Plus size={18} /> Nueva Encuesta
-                    </Button>
-                )}
+                <Button variant="primary" onClick={() => setIsModalOpen(true)}>
+                    <Plus size={18} /> Nueva Encuesta
+                </Button>
             </div>
 
             {loading ? (
@@ -101,8 +99,11 @@ export default function PollsPage() {
             ) : (
                 <div className="grid-auto">
                     {polls.length === 0 ? (
-                        <Card title="Sin encuestas">
-                            <p style={{ color: 'var(--text-muted)' }}>No hay encuestas activas en este momento.</p>
+                        <Card title="Sin encuestas" style={{ padding: '4rem 2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '1rem' }}>No hay encuestas activas en este momento.</p>
+                            <Button variant="primary" onClick={() => setIsModalOpen(true)} size="lg">
+                                <Plus size={20} style={{ marginRight: '8px' }} /> Crear Primera Encuesta
+                            </Button>
                         </Card>
                     ) : polls.map((poll) => {
                         const hasVoted = poll.voters?.includes(user?.uid);

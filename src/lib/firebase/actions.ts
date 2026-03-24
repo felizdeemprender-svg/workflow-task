@@ -131,14 +131,26 @@ export const taskActions = {
             ...messageData,
             createdAt: serverTimestamp(),
         });
+        
+        // Update message count for UI indicator
+        await updateDoc(doc(db, 'tasks', taskId), {
+            messageCount: increment(1)
+        });
     },
 
-    updateTask: async (taskId: string, taskData: any) => {
+    updateTask: async (taskId: string, taskData: any, log?: { action: string, user: string, details: string }) => {
         const taskRef = doc(db, 'tasks', taskId);
         await updateDoc(taskRef, {
             ...taskData,
             updatedAt: serverTimestamp(),
         });
+
+        if (log) {
+            await addDoc(collection(db, `tasks/${taskId}/log`), {
+                ...log,
+                createdAt: serverTimestamp(),
+            });
+        }
     },
 
     deleteTask: async (taskId: string) => {

@@ -12,7 +12,7 @@ service cloud.firestore {
     function getCompanyId() {
       return request.auth.token.company_id != null ? 
              request.auth.token.company_id : 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.company_id;
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('company_id', null);
     }
 
     // Get user role helper
@@ -74,10 +74,10 @@ service cloud.firestore {
       }
     }
 
-    // Polls
     match /polls/{pollId} {
       allow read: if isAuthenticated() && (isCEO() || getCompanyId() == resource.data.company_id);
-      allow create, update: if isAuthenticated() && (isCEO() || getCompanyId() == request.resource.data.get('company_id', resource.data.get('company_id', null)));
+      allow create: if isAuthenticated() && (isCEO() || (getCompanyId() != null && getCompanyId() == request.resource.data.company_id));
+      allow update: if isAuthenticated() && (isCEO() || (getCompanyId() != null && getCompanyId() == resource.data.company_id));
     }
 
     // Notifications: Owner only for read/delete.

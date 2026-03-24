@@ -33,22 +33,23 @@ export const Button = ({
         alignItems: 'center',
         justifyContent: 'center',
         fontWeight: 600,
-        borderRadius: '12px',
+        borderRadius: '14px',
         cursor: isClickable ? 'pointer' : 'not-allowed',
         opacity: isClickable ? 1 : 0.6,
         border: 'none',
-        boxShadow: variant === 'primary' && isClickable ? '0 4px 12px rgba(79, 70, 229, 0.25)' : 'none',
+        boxShadow: variant === 'primary' && isClickable ? '0 8px 16px -4px rgba(99, 102, 241, 0.3)' : 'none',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         ...getSpacingStyles()
     };
 
     const getVariantStyles = () => {
         switch (variant) {
             case 'primary': return { backgroundColor: 'var(--primary)', color: 'white' };
-            case 'secondary': return { backgroundColor: 'var(--primary-light)', color: 'var(--primary)' };
+            case 'secondary': return { backgroundColor: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)' };
             case 'outline': return { backgroundColor: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border-light)' };
-            case 'danger': return { backgroundColor: '#fee2e2', color: '#dc2626' };
-            case 'success': return { backgroundColor: '#dcfce7', color: '#166534' };
-            case 'warning': return { backgroundColor: '#fef3c7', color: '#92400e' };
+            case 'danger': return { backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' };
+            case 'success': return { backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' };
+            case 'warning': return { backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' };
             case 'ghost': return { backgroundColor: 'transparent', color: 'var(--text-muted)' };
             default: return { backgroundColor: 'transparent' };
         }
