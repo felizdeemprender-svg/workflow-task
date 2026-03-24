@@ -20,6 +20,12 @@ import { db } from "@/lib/firebase/config";
 import { doc, onSnapshot, orderBy, collection, serverTimestamp } from "firebase/firestore";
 import { aiService } from "@/lib/ai/service";
 
+export function generateStaticParams() {
+    return [];
+}
+
+export const dynamicParams = true;
+
 export default function TaskDetailPage() {
     const { id } = useParams();
     const { user } = useAuth();
