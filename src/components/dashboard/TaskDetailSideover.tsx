@@ -193,7 +193,7 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
                             right: 0,
                             bottom: 0,
                             width: '100%',
-                            maxWidth: '500px',
+                            maxWidth: '650px',
                             backgroundColor: 'var(--bg-card)',
                             boxShadow: '-10px 0 50px rgba(0,0,0,0.5)',
                             zIndex: 1001,
