@@ -1,6 +1,8 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { google } from "googleapis";
+
+// Load googleapis lazily to avoid deployment timeout
+const getGoogle = () => require("googleapis").google;
 
 /**
  * Helper to get the Google OAuth2 client with the system token.
@@ -14,6 +16,8 @@ async function getAuthClient(companyId: string) {
         console.error(`Google Calendar Sync failed: No config found for company ${companyId}`);
         return null;
     }
+
+    const google = getGoogle();
 
     // Option 1: Service Account JSON (Recommended)
     if (configData.serviceAccountJson) {
@@ -68,6 +72,7 @@ export const onTaskCreatedSync = functions.firestore
         const auth = await getAuthClient(taskData.company_id);
         if (!auth) return;
 
+        const google = getGoogle();
         const calendar = google.calendar({ version: "v3", auth });
 
         const event = {
@@ -122,6 +127,7 @@ export const onTaskUpdatedSync = functions.firestore
         const auth = await getAuthClient(after.company_id);
         if (!auth) return;
 
+        const google = getGoogle();
         const calendar = google.calendar({ version: "v3", auth });
 
         // If status changed to Finalizado, we might want to mark it differently in calendar?
@@ -172,6 +178,7 @@ export const onTaskDeletedSync = functions.firestore
         const auth = await getAuthClient(taskData.company_id);
         if (!auth) return;
 
+        const google = getGoogle();
         const calendar = google.calendar({ version: "v3", auth });
 
         try {
