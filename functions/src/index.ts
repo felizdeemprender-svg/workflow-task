@@ -4,8 +4,8 @@ import axios from "axios";
 
 admin.initializeApp();
 
-const db = admin.firestore();
-const auth = admin.auth();
+const getDb = () => admin.firestore();
+const getAuth = () => admin.auth();
 
 /**
  * Webhook to sync companies from the master database.
@@ -21,7 +21,7 @@ export const syncCompany = functions.https.onRequest(async (req, res) => {
     const { id, data } = req.body;
 
     try {
-        await db.collection("companies").doc(id).set({
+        await getDb().collection("companies").doc(id).set({
             ...data,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
@@ -46,7 +46,7 @@ export const onUserUpdate = functions.firestore
         const userId = context.params.userId;
 
         try {
-            await auth.setCustomUserClaims(userId, {
+            await getAuth().setCustomUserClaims(userId, {
                 company_id,
                 role,
                 area,
@@ -67,7 +67,7 @@ export const botResponse = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
         if (!message || !message.text.includes("@bot")) return;
 
         const { taskId } = context.params;
-        const taskRef = db.collection("tasks").doc(taskId);
+        const taskRef = getDb().collection("tasks").doc(taskId);
 
         try {
             // 1. Get Task Context
@@ -77,7 +77,7 @@ export const botResponse = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
 
             // 2. Validate Company Quota
             const companyId = taskData.company_id;
-            const companyDoc = await db.collection("companies").doc(companyId).get();
+            const companyDoc = await getDb().collection("companies").doc(companyId).get();
             const companyData = companyDoc.data();
 
             if (!companyData || !companyData.has_workflow_access || companyData.ai_quota <= 0) {
@@ -154,7 +154,7 @@ export const botResponse = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
             });
 
             // 8. Discount AI Quota
-            await db.collection("companies").doc(companyId).update({
+            await getDb().collection("companies").doc(companyId).update({
                 ai_quota: admin.firestore.FieldValue.increment(-1)
             });
 
@@ -175,7 +175,7 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
 
     // 2. Validate permissions (CEO or Admin)
     const callerUid = context.auth.uid;
-    const callerDoc = await db.collection("users").doc(callerUid).get();
+    const callerDoc = await getDb().collection("users").doc(callerUid).get();
     const callerData = callerDoc.data();
 
     if (!callerData || (callerData.role !== "CEO" && callerData.role !== "Admin")) {
@@ -196,7 +196,7 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
 
     try {
         // 4. Create User in Firebase Auth
-        const userRecord = await auth.createUser({
+        const userRecord = await getAuth().createUser({
             email,
             password,
             displayName: email.split("@")[0],
@@ -205,14 +205,14 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
         const newUserId = userRecord.uid;
 
         // 5. Set Custom Claims immediately
-        await auth.setCustomUserClaims(newUserId, {
+        await getAuth().setCustomUserClaims(newUserId, {
             company_id,
             role,
             area: area || "General",
         });
 
         // 6. Create Firestore Profile
-        await db.collection("users").doc(newUserId).set({
+        await getDb().collection("users").doc(newUserId).set({
             email,
             company_id,
             role,
@@ -232,6 +232,59 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Invite a user by email (Firestore only).
+ * Allows CEOs and Admins to pre-register users for Google getAuth().
+ */
+export const adminInviteUser = functions.https.onCall(async (data, context) => {
+    // 1. Check authentication
+    if (!context.auth) {
+        throw new functions.https.HttpsError("unauthenticated", "Debe estar autenticado.");
+    }
+
+    // 2. Validate permissions (CEO or Admin)
+    const callerUid = context.auth.uid;
+    const callerDoc = await getDb().collection("users").doc(callerUid).get();
+    const callerData = callerDoc.data();
+
+    if (!callerData || (callerData.role !== "CEO" && callerData.role !== "Admin")) {
+        throw new functions.https.HttpsError("permission-denied", "No tiene permisos para invitar usuarios.");
+    }
+
+    const { email, company_id, role, area, accessibleAreas, name } = data;
+
+    // 3. Validation
+    if (!email || !company_id || !role) {
+        throw new functions.https.HttpsError("invalid-argument", "Faltan campos obligatorios (email, company_id, role).");
+    }
+
+    // Admin constraint: can only manage their own company
+    if (callerData.role === "Admin" && company_id !== callerData.company_id) {
+        throw new functions.https.HttpsError("permission-denied", "Como Administrador solo puede invitar a usuarios para su propia empresa.");
+    }
+
+    try {
+        const inviteId = `invite_${email.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        
+        await getDb().collection("users").doc(inviteId).set({
+            email,
+            company_id,
+            role,
+            area: area || "General",
+            accessibleAreas: Array.isArray(accessibleAreas) ? accessibleAreas : [area || "General"],
+            name: name || "",
+            status: "invited",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return { success: true, inviteId };
+    } catch (error: any) {
+        console.error("Error en adminInviteUser:", error);
+        throw new functions.https.HttpsError("internal", error.message || "Error al invitar al usuario.");
+    }
+});
+
+/**
  * Update an existing user's profile and claims (CEO/Admin only)
  */
 export const adminUpdateUser = functions.https.onCall(async (data, context) => {
@@ -241,7 +294,7 @@ export const adminUpdateUser = functions.https.onCall(async (data, context) => {
     }
 
     const callerUid = context.auth.uid;
-    const callerDoc = await db.collection("users").doc(callerUid).get();
+    const callerDoc = await getDb().collection("users").doc(callerUid).get();
     const callerData = callerDoc.data();
 
     if (!callerData || (callerData.role !== "CEO" && callerData.role !== "Admin")) {
@@ -255,7 +308,7 @@ export const adminUpdateUser = functions.https.onCall(async (data, context) => {
     }
 
     try {
-        const targetDoc = await db.collection("users").doc(targetUid).get();
+        const targetDoc = await getDb().collection("users").doc(targetUid).get();
         if (!targetDoc.exists) {
             throw new functions.https.HttpsError("not-found", "Usuario no encontrado.");
         }
@@ -269,12 +322,12 @@ export const adminUpdateUser = functions.https.onCall(async (data, context) => {
 
         // update password if provided
         if (password && password.length >= 6) {
-            await auth.updateUser(targetUid, { password });
+            await getAuth().updateUser(targetUid, { password });
         }
 
         // 2. Update Auth Claims if role or area changed
         if (role || area) {
-            await auth.setCustomUserClaims(targetUid, {
+            await getAuth().setCustomUserClaims(targetUid, {
                 company_id: targetData.company_id,
                 role: role || targetData.role,
                 area: area || targetData.area,
@@ -291,7 +344,7 @@ export const adminUpdateUser = functions.https.onCall(async (data, context) => {
         if (phone) updates.phone = phone;
         if (accessibleAreas) updates.accessibleAreas = accessibleAreas;
 
-        await db.collection("users").doc(targetUid).update(updates);
+        await getDb().collection("users").doc(targetUid).update(updates);
 
         return { success: true };
     } catch (error: any) {
@@ -306,12 +359,12 @@ export const getDailyBriefing = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
     if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Auth required");
     
     const uid = context.auth.uid;
-    const userDoc = await db.collection("users").doc(uid).get();
+    const userDoc = await getDb().collection("users").doc(uid).get();
     const userData = userDoc.data();
     if (!userData) throw new functions.https.HttpsError("not-found", "User not found");
 
     // Fetch pending tasks
-    const tasksSnapshot = await db.collection("tasks")
+    const tasksSnapshot = await getDb().collection("tasks")
         .where("company_id", "==", userData.company_id)
         .where("assignedEmail", "==", userData.email)
         .where("status", "!=", "Finalizado")
@@ -363,7 +416,7 @@ export const processAICommand = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
     if (!command) throw new functions.https.HttpsError("invalid-argument", "Command required");
 
     const uid = context.auth.uid;
-    const userDoc = await db.collection("users").doc(uid).get();
+    const userDoc = await getDb().collection("users").doc(uid).get();
     const userData = userDoc.data();
     if (!userData) throw new functions.https.HttpsError("not-found", "User not found");
 
@@ -373,7 +426,7 @@ export const processAICommand = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
     try {
         // Fetch company areas
         const companyId = userData.company_id;
-        const companyDoc = await db.collection("companies").doc(companyId).get();
+        const companyDoc = await getDb().collection("companies").doc(companyId).get();
         const companyData = companyDoc.data();
         const availableAreas = companyData?.areas || ["General", "Ventas", "Logística", "Soporte"];
         const areasStr = availableAreas.join("/");
@@ -396,7 +449,7 @@ export const processAICommand = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
 
         const taskData = JSON.parse(response.data.choices[0].message.content);
         
-        const taskRef = await db.collection("tasks").add({
+        const taskRef = await getDb().collection("tasks").add({
             ...taskData,
             company_id: userData.company_id,
             assignedEmail: userData.email,
@@ -406,7 +459,7 @@ export const processAICommand = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
             createdBy: userData.email
         });
 
-        await db.collection(`tasks/${taskRef.id}/log`).add({
+        await getDb().collection(`tasks/${taskRef.id}/log`).add({
             action: "AI_COMMAND_CREATION",
             user: "AI Assistant",
             details: `Tarea creada automáticamente vía comando: "${command}"`,
@@ -446,12 +499,12 @@ export const onTaskStatusFinalized = functions.runWith({ secrets: ["DEEPSEEK_API
                 return;
             }
 
-            const userSnapshot = await db.collection("users").where("email", "==", email).get();
+            const userSnapshot = await getDb().collection("users").where("email", "==", email).get();
             // Try again with original casing if fails (just in case)
             let userDoc = userSnapshot.empty ? null : userSnapshot.docs[0];
             
             if (!userDoc && after.assignedEmail) {
-                const userSnapshotOriginal = await db.collection("users").where("email", "==", after.assignedEmail).get();
+                const userSnapshotOriginal = await getDb().collection("users").where("email", "==", after.assignedEmail).get();
                 if (!userSnapshotOriginal.empty) userDoc = userSnapshotOriginal.docs[0];
             }
 
@@ -517,7 +570,7 @@ export const onTaskStatusFinalized = functions.runWith({ secrets: ["DEEPSEEK_API
             console.log(`[onTaskStatusFinalized] User points and history updated successfully.`);
 
             // Log the achievement in the task itself
-            await db.collection("tasks").doc(taskId).collection("log").add({
+            await getDb().collection("tasks").doc(taskId).collection("log").add({
                 action: "SPIRIT_POINTS_AWARDED",
                 user: "System",
                 details: `Premiado con ${points} puntos Spirit (Dificultad IA: ${difficulty}).`,
@@ -565,3 +618,6 @@ export const generalChat = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
         throw new functions.https.HttpsError("internal", "Error al conectar con la IA.");
     }
 });
+
+// Global Exports
+export * from "./calendarSync";

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { 
-    Plus, Filter, Loader2, Database, Users, Clock, 
+    Plus, Filter, Loader2, Users, Clock, 
     MoreVertical, RefreshCw, UserCheck, Hammer, 
     CheckCheck, Circle, Wrench, Timer, Play, 
     ChevronDown, X, MessageSquare, Square, Folder, Search,
@@ -37,7 +37,7 @@ export default function TasksPage() {
         area: user?.area || "General",
         status: "Pendiente",
         dueDate: new Date().toISOString().split('T')[0],
-        assignedEmail: "",
+        assignedEmails: [] as string[],
         attachments: [] as any[],
         recurrence: {
             frequency: "None",
@@ -53,24 +53,13 @@ export default function TasksPage() {
         if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
         const newStatus = destination.droppableId;
-        const oldStatus = source.droppableId;
         const taskId = draggableId;
 
         try {
-            toast.promise(
-                taskActions.updateTask(taskId, { status: newStatus }, {
-                    action: 'CAMBIO DE ESTADO',
-                    user: user?.email || 'Sistema',
-                    details: `${oldStatus} -> ${newStatus} (Arrastre)`
-                }),
-                {
-                    loading: 'Actualizando estado...',
-                    success: 'Estado actualizado correctamente',
-                    error: 'Error al actualizar el estado'
-                }
-            );
+            await taskActions.updateStatus(taskId, newStatus, user?.uid || 'Sistema');
         } catch (error) {
-            console.error("Error handling drag end:", error);
+            console.error("Error updating task status:", error);
+            toast.error("Error al mover la tarea");
         }
     };
 
@@ -127,6 +116,10 @@ export default function TasksPage() {
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user?.company_id) return;
+        if (!newTask.title.trim()) {
+            toast.error("El título es obligatorio");
+            return;
+        }
         setIsSubmitting(true);
         try {
             await taskActions.createTask(user.company_id, {
@@ -141,7 +134,7 @@ export default function TasksPage() {
                 area: user?.area || "General",
                 status: "Pendiente",
                 dueDate: new Date().toISOString().split('T')[0],
-                assignedEmail: "",
+                assignedEmails: [],
                 attachments: [],
                 recurrence: {
                     frequency: "None",
@@ -163,6 +156,9 @@ export default function TasksPage() {
             <div className="card p-4 sm:p-5 pr-1 sm:pr-1 flex-row gap-4 w-full" style={{ boxShadow: 'var(--shadow-premium)', border: 'none', alignItems: 'center' }}>
                 <div className="flex-col gap-4 flex-1 min-w-0">
                     <div className="flex-col gap-3">
+                        <div className="flex-row justify-between items-center">
+                            <h2 style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nueva Tarea</h2>
+                        </div>
                         <input
                             type="text"
                             placeholder="¿Qué hay que hacer?"
@@ -261,7 +257,7 @@ export default function TasksPage() {
                             </div>
                             <div 
                                 onClick={() => {
-                                    const next: any = { "None": "Daily", "Daily": "Weekly", "Weekly": "Monthly", "Monthly": "None" };
+                                    const next: any = { "None": "Diaria", "Diaria": "Semanal", "Semanal": "Mensual", "Mensual": "None" };
                                     setNewTask({ ...newTask, recurrence: { ...newTask.recurrence, frequency: next[newTask.recurrence.frequency] || "None" } });
                                 }}
                                 style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer' }}
@@ -281,6 +277,48 @@ export default function TasksPage() {
                                 className="hover-primary-text"
                             >
                                 <Filter size={12} /> <span>{newTask.priority}</span>
+                            </div>
+                        </div>
+
+                        {/* Assignee Selection */}
+                        <div className="flex-col gap-2 mt-2 pt-3" style={{ borderTop: '1px solid var(--border-light)' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.5, textTransform: 'uppercase', marginLeft: '2px' }}>Asignar a Equipo</span>
+                            <div className="flex-row flex-wrap gap-2">
+                                {companyUsers?.map((u: any) => (
+                                    <div 
+                                        key={u.email}
+                                        onClick={() => {
+                                            const emails = newTask.assignedEmails || [];
+                                            const newEmails = emails.includes(u.email) 
+                                                ? emails.filter(e => e !== u.email)
+                                                : [...emails, u.email];
+                                            setNewTask({ ...newTask, assignedEmails: newEmails });
+                                        }}
+                                        style={{ 
+                                            padding: '4px 10px', 
+                                            borderRadius: '8px', 
+                                            fontSize: '0.7rem', 
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            background: (newTask.assignedEmails || []).includes(u.email) ? 'var(--primary-light)' : 'var(--bg-main)',
+                                            color: (newTask.assignedEmails || []).includes(u.email) ? 'var(--primary)' : 'var(--text-muted)',
+                                            border: `1px solid ${(newTask.assignedEmails || []).includes(u.email) ? 'var(--primary)' : 'var(--border-light)'}`
+                                        }}
+                                    >
+                                        <div style={{ 
+                                            width: '8px', 
+                                            height: '8px', 
+                                            borderRadius: '2px', 
+                                            border: '1px solid currentColor',
+                                            background: (newTask.assignedEmails || []).includes(u.email) ? 'currentColor' : 'transparent'
+                                        }} />
+                                        {u.name || u.email.split('@')[0]}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -405,7 +443,7 @@ export default function TasksPage() {
                             { label: "En Progreso", dbValue: "En Proceso", color: "#f59e0b" },
                             { label: "Terminado", dbValue: "Finalizada", color: "#10b981" }
                         ].map(col => {
-                            const colTasks = filteredTasks.filter((t: any) => (t.status || "Pendiente") === col.dbValue);
+                            const colTasks = (tasks || []).filter((t: any) => (t.status || "Pendiente") === col.dbValue && filteredTasks.some((ft: any) => ft.id === t.id));
 
                             return (
                                 <div key={col.label} className="flex-col gap-6 kanban-column" style={{ minWidth: 0 }}>
@@ -506,10 +544,14 @@ export default function TasksPage() {
                                                                                 </div>
 
                                                                                 <div className="flex-row justify-between items-center opacity-60">
-                                                                                    {task.assignedEmail ? (
+                                                                                    {(task.assignedEmails?.length > 0 || task.assignedEmail) ? (
                                                                                         <div className="flex-row gap-1.5 items-center text-muted" style={{ fontSize: '0.65rem' }}>
                                                                                             <Users size={12} />
-                                                                                            <span>{companyUsers?.find((u: any) => u.email === task.assignedEmail)?.name || task.assignedEmail}</span>
+                                                                                            <span>
+                                                                                                {(task.assignedEmails || [task.assignedEmail])
+                                                                                                    .map((email: string) => companyUsers?.find((u: any) => u.email === email)?.name || email.split('@')[0])
+                                                                                                    .join(', ')}
+                                                                                            </span>
                                                                                         </div>
                                                                                     ) : <div />}
                                                                                     <div className="flex-row gap-2">
@@ -542,6 +584,7 @@ export default function TasksPage() {
                 isOpen={isSideoverOpen} 
                 onClose={() => setIsSideoverOpen(false)} 
             />
+
 
             <style jsx>{`
                 .no-scrollbar::-webkit-scrollbar { 

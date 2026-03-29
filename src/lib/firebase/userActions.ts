@@ -82,6 +82,23 @@ export const userActions = {
     },
 
     /**
+     * Invite a user by email (Firestore only).
+     * This prepares the profile so the user can link it via Google later.
+     */
+    inviteUser: async (inviteData: {
+        email: string;
+        company_id: string;
+        role: 'Admin' | 'Empleado' | 'CEO';
+        area: string;
+        accessibleAreas?: string[];
+        name?: string;
+    }) => {
+        const inviteUserFn = httpsCallable(functions, 'adminInviteUser');
+        const result = await inviteUserFn(inviteData);
+        return result.data;
+    },
+
+    /**
      * Change current user password with re-authentication.
      */
     changePassword: async (currentPassword: string, newPassword: string) => {

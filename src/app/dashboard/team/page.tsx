@@ -1,323 +1,303 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
+import { 
+    Users, Plus, Mail, Shield, Trash2, 
+    MoreVertical, Search, CheckCircle2, X,
+    Calendar, Lock, Settings, Globe, Key,
+    MailCheck, AlertCircle, ExternalLink,
+    Loader2
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/context/AuthContext";
 import { useFirestoreQuery } from "@/hooks/useFirestoreQuery";
-import { where } from "firebase/firestore";
-import { Users, Shield, User as UserIcon, Mail, Plus, UserPlus, Loader2 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { userActions } from "@/lib/firebase/userActions";
+import { db } from "@/lib/firebase/config";
+import { collection, addDoc, updateDoc, doc, deleteDoc, where, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { toast } from "sonner";
 
 export default function TeamPage() {
     const { user } = useAuth();
+    const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+    const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    
+    // Auth and Logic for System Calendar
+    const [syncMode, setSyncMode] = useState<'oauth' | 'service'>('oauth');
+    const [serviceAccountJson, setServiceAccountJson] = useState("");
+    const [isConfiguring, setIsConfiguring] = useState(false);
 
-    const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
-    const [loadingAction, setLoadingAction] = React.useState(false);
-    const [newMember, setNewMember] = React.useState({ 
-        email: '', 
-        password: '',
-        area: 'General', 
-        role: 'Empleado' as 'Empleado' | 'Admin'
-    });
-    const [accessibleAreas, setAccessibleAreas] = React.useState<string[]>(['General']);
-    const [editingMemberId, setEditingMemberId] = React.useState<string | null>(null);
+    const userConstraints = useMemo(() => 
+        user?.company_id ? [where('company_id', '==', user.company_id)] : [],
+        [user?.company_id]
+    );
 
-    const areas = ["General", "Ventas", "Logística", "Soporte", "Administración", "Producción", "Recursos Humanos"];
+    const { data: teamMembers, loading } = useFirestoreQuery<any>('users', userConstraints, !!user?.company_id);
 
-    const constraints = React.useMemo(() => {
-        if (!user?.company_id) return [];
-        return [where('company_id', '==', user.company_id)];
-    }, [user?.company_id]);
-
-    const { data: teamMembers, loading } = useFirestoreQuery<any>('users', constraints, !!user?.company_id);
-    const [searchTerm, setSearchTerm] = React.useState("");
-
-    const filteredMembers = React.useMemo(() => {
-        return (teamMembers || []).filter((m: any) => 
+    const filteredMembers = useMemo(() => {
+        if (!teamMembers) return [];
+        return teamMembers.filter(m => 
+            m.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
             m.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            m.name?.toLowerCase().includes(searchTerm.toLowerCase())
+            m.area?.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [teamMembers, searchTerm]);
 
-    const handleAddMember = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleLinkSystemCalendar = async () => {
         if (!user?.company_id) return;
-        setLoadingAction(true);
+        setIsSyncing(true);
         try {
-            if (editingMemberId) {
-                // UPDATE MODE
-                await userActions.updateUser({
-                    targetUid: editingMemberId,
-                    role: newMember.role,
-                    area: newMember.area,
-                    accessibleAreas: Array.from(new Set([...accessibleAreas, newMember.area])),
-                    ...(newMember.password ? { password: newMember.password } : {})
-                });
-                alert("Miembro actualizado con éxito.");
-            } else {
-                // CREATE MODE
-                await userActions.createUser({
-                    ...newMember,
-                    company_id: user.company_id,
-                    accessibleAreas: Array.from(new Set([...accessibleAreas, newMember.area]))
-                });
-                alert("Miembro registrado con éxito.");
-            }
-            setIsAddModalOpen(false);
-            setEditingMemberId(null);
-            setNewMember({ email: '', password: '', area: 'General', role: 'Empleado' });
-            setAccessibleAreas(['General']);
-        } catch (error: any) {
-            console.error(error);
-            alert("Error: " + (error.message || "Error desconocido"));
+            // Google OAuth2 Popup for the SYSTEM account
+            const G_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+            const G_SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+            
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${G_CLIENT_ID}&redirect_uri=${window.location.origin}/dashboard/team&response_type=code&scope=${encodeURIComponent(G_SCOPES)}&access_type=offline&prompt=consent`;
+            
+            // For this demo/implementation, we assume the user finishes the flow.
+            // In a real app, you'd handle the redirect. 
+            // Here, we provide a button to test the connection.
+            window.open(authUrl, '_blank');
+            toast.info("Por favor, completa la autenticación en la nueva ventana.");
+        } catch (error) {
+            console.error("Link error:", error);
+            toast.error("Error al iniciar vinculación");
         } finally {
-            setLoadingAction(false);
+            setIsSyncing(false);
         }
     };
 
-    const openEditModal = (member: any) => {
-        setEditingMemberId(member.id);
-        setNewMember({
-            email: member.email,
-            password: '', // We don't show the password
-            area: member.area || 'General',
-            role: member.role || 'Empleado'
-        });
-        setAccessibleAreas(member.accessibleAreas || [member.area || 'General']);
-        setIsAddModalOpen(true);
-    };
+    const handleSaveServiceAccount = async () => {
+        if (!user?.company_id || !serviceAccountJson) return;
+        setIsConfiguring(true);
+        try {
+            const config = JSON.parse(serviceAccountJson);
+            if (!config.project_id || !config.private_key) {
+                throw new Error("Formato de JSON inválido");
+            }
 
-    const getRoleStyles = (role: string) => {
-        switch (role) {
-            case 'Admin': return { bg: '#eef2ff', color: '#4f46e5', icon: Shield };
-            case 'CEO': return { bg: '#fff7ed', color: '#ea580c', icon: Shield };
-            default: return { bg: '#f1f5f9', color: '#64748b', icon: UserIcon };
+            await setDoc(doc(db, 'companies', user.company_id, 'config', 'calendar'), {
+                type: 'service_account',
+                credentials: config,
+                updatedAt: serverTimestamp(),
+                updatedBy: user.email
+            }, { merge: true });
+
+            toast.success("Cuenta de servicio configurada correctamente");
+            setServiceAccountJson("");
+            setIsSyncModalOpen(false);
+        } catch (error: any) {
+            toast.error(error.message || "Error al guardar configuración");
+        } finally {
+            setIsConfiguring(false);
         }
     };
+
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-[400px]">
+            <Loader2 className="animate-spin text-primary" size={32} />
+        </div>
+    );
+
+    const isCEO = user?.role === 'CEO' || user?.role === 'Admin';
 
     return (
-        <div className="flex-col gap-8 fade-in">
-            <div className="flex-row justify-between items-center">
-                <div>
-                    <h1>{user?.role === 'Empleado' ? 'Nuestro Equipo' : 'Gestión de Equipo'}</h1>
-                    <p className="text-muted">
-                        {user?.role === 'Empleado' 
-                            ? 'Conoce a tus compañeros y sus áreas de especialidad.' 
-                            : 'Administra los miembros de tu organización y sus permisos.'}
-                    </p>
+        <div className="flex-col gap-6 fade-in">
+            {/* Header / Stats */}
+            <div className="flex-row justify-between items-end gap-4">
+                <div className="flex-col gap-1">
+                    <h1 className="text-2xl font-black text-main">Equipo</h1>
+                    <p className="text-muted text-sm font-medium">Gestiona los miembros y permisos de tu organización.</p>
                 </div>
-                <div className="flex-row gap-4">
-                    <div className="premium-input flex-row gap-2" style={{ width: '300px', padding: '0.5rem 1rem' }}>
-                        <Users size={18} className="text-muted" />
-                        <input 
-                            type="text" 
-                            placeholder="Buscar por nombre o email..." 
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontSize: '0.9rem' }}
-                        />
-                    </div>
-                    <div className="flex-row gap-4" style={{ backgroundColor: 'var(--bg-main)', padding: '0.5rem 1rem', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-                        <span className="font-bold text-primary">{teamMembers.length} Miembros</span>
-                    </div>
-                    {(user?.role === 'Admin' || user?.role === 'CEO') && (
-                        <Button variant="primary" onClick={() => {
-                            setEditingMemberId(null);
-                            setNewMember({ email: '', password: '', area: 'General', role: 'Empleado' });
-                            setAccessibleAreas(['General']);
-                            setIsAddModalOpen(true);
-                        }}>
-                            <UserPlus size={18} /> Agregar
+                
+                <div className="flex-row gap-3">
+                    {isCEO && (
+                        <Button 
+                            variant="outline" 
+                            className="flex-row gap-2"
+                            onClick={() => setIsSyncModalOpen(true)}
+                        >
+                            <Calendar size={18} />
+                            Vincular Google Calendar
                         </Button>
                     )}
+                    <Button variant="primary" className="flex-row gap-2" onClick={() => setIsAddUserOpen(true)}>
+                        <Plus size={18} />
+                        Añadir Miembro
+                    </Button>
                 </div>
             </div>
 
-            <Card title="Directorio de Miembros">
-                {loading ? (
-                    <div className="flex-row justify-center" style={{ padding: '4rem' }}>
-                        <Loader2 className="animate-spin" color="var(--primary)" size={40} />
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', backgroundColor: 'var(--border-light)', borderRadius: '8px', overflow: 'hidden' }}>
-                        {filteredMembers.length === 0 ? (
-                            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: 'white' }}>
-                                No se encontraron miembros.
-                            </div>
-                        ) : filteredMembers.map((member: any) => {
-                            const styles = getRoleStyles(member.role);
-                            const Icon = styles.icon;
-
-                            return (
-                                <div key={member.id} className="fade-in" style={{
-                                    padding: '1.25rem',
-                                    backgroundColor: 'white',
-                                    borderBottom: '1px solid var(--border-light)',
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr 150px'
-                                }}>
-                                    <div className="flex-row gap-4">
-                                        <div style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            borderRadius: '50%',
-                                            backgroundColor: styles.bg,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: styles.color
-                                        }}>
-                                            <Icon size={20} />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold" style={{ fontSize: '0.925rem' }}>{member.email?.split('@')[0]}</p>
-                                            <p className="text-small text-muted flex-row gap-1">
-                                                <Mail size={12} /> {member.email}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-small text-muted font-bold" style={{ textTransform: 'uppercase', marginBottom: '2px' }}>Área</p>
-                                        <p className="text-muted font-bold" style={{ color: 'var(--text-main)' }}>{member.area || 'General'}</p>
-                                    </div>
-                                     <div className="flex-row gap-2" style={{ justifyContent: 'flex-end', alignItems: 'center' }}>
-                                         {(user?.role === 'Admin' || user?.role === 'CEO') && (
-                                             <Button 
-                                                variant="outline" 
-                                                size="sm"
-                                                onClick={() => openEditModal(member)}
-                                                style={{ fontSize: '0.7rem', padding: '0.4rem 0.8rem' }}
-                                             >
-                                                 Editar
-                                             </Button>
-                                         )}
-                                         <span style={{
-                                            padding: '0.25rem 0.5rem',
-                                            borderRadius: '6px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 600,
-                                            backgroundColor: styles.bg,
-                                            color: styles.color,
-                                            textTransform: 'uppercase'
-                                         }}>
-                                             {member.role}
-                                         </span>
-                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </Card>
-
-            <Modal 
-                isOpen={isAddModalOpen} 
-                onClose={() => setIsAddModalOpen(false)} 
-                title={editingMemberId ? "Editar Miembro" : "Agregar Nuevo Miembro"}
-            >
-                <form onSubmit={handleAddMember} className="flex-col gap-3">
-                    <div className="flex-col gap-1">
-                        <label className="text-small font-bold" style={{ color: 'var(--text-muted)' }}>Email del Colaborador</label>
-                        <input
-                            type="email"
-                            required
-                            disabled={!!editingMemberId}
-                            className="premium-input"
-                            value={newMember.email}
-                            onChange={e => setNewMember({ ...newMember, email: e.target.value })}
-                            placeholder="empleado@empresa.com"
-                        />
-                    </div>
-                    <div className="flex-col gap-1">
-                        <label className="text-small font-bold" style={{ color: 'var(--text-muted)' }}>
-                            {editingMemberId ? "Nueva Contraseña (Dejar vacío para no cambiar)" : "Contraseña Inicial"}
-                        </label>
-                        <input
-                            type="password"
-                            required={!editingMemberId}
-                            minLength={6}
-                            className="premium-input"
-                            value={newMember.password}
-                            onChange={e => setNewMember({ ...newMember, password: e.target.value })}
-                            placeholder={editingMemberId ? "Opcional" : "Mínimo 6 caracteres"}
-                        />
-                    </div>
-                    <div className="flex-col gap-1">
-                        <label className="text-small font-bold" style={{ color: 'var(--text-muted)' }}>Área de Injerencia (Principal)</label>
-                        <select
-                            required
-                            className="premium-input"
-                            value={newMember.area}
-                            onChange={e => {
-                                const newArea = e.target.value;
-                                setNewMember({ ...newMember, area: newArea });
-                                if (!accessibleAreas.includes(newArea)) {
-                                    setAccessibleAreas([...accessibleAreas, newArea]);
-                                }
-                            }}
-                        >
-                            {areas.map(area => (
-                                <option key={area} value={area}>{area}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="flex-col gap-1">
-                        <label className="text-small font-bold" style={{ color: 'var(--text-muted)' }}>Rol</label>
-                        <select
-                            className="premium-input"
-                            value={newMember.role}
-                            onChange={e => setNewMember({ ...newMember, role: e.target.value as any })}
-                        >
-                            <option value="Empleado">Empleado</option>
-                            <option value="Admin">Administrador</option>
-                        </select>
-                    </div>
-
-                    <div className="flex-col gap-2" style={{ marginTop: '0.25rem' }}>
-                        <label className="text-small font-bold" style={{ color: 'var(--text-muted)' }}>Otras Áreas con Acceso Permitido</label>
-                        <div style={{ 
-                            display: 'grid', 
-                            gridTemplateColumns: '1fr 1fr', 
-                            gap: '0.75rem',
-                            padding: '1rem',
-                            backgroundColor: 'var(--bg-main)',
-                            borderRadius: 'var(--radius-md)',
-                            border: '1px solid var(--border-light)'
-                        }}>
-                            {areas.map(area => (
-                                <label key={area} className="flex-row gap-2" style={{ alignItems: 'center', cursor: 'pointer' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={accessibleAreas.includes(area)}
-                                        onChange={e => {
-                                            if (e.target.checked) {
-                                                setAccessibleAreas([...accessibleAreas, area]);
-                                            } else {
-                                                if (area !== newMember.area) {
-                                                    setAccessibleAreas(accessibleAreas.filter(a => a !== area));
-                                                }
-                                            }
-                                        }}
-                                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                                    />
-                                    <span style={{ fontSize: '0.875rem', color: 'var(--text-main)' }}>{area}</span>
-                                </label>
-                            ))}
+            {/* Config Info Card (Admins Only) */}
+            {isCEO && (
+                <Card className="p-4 border-dashed border-2 flex-row items-center justify-between gap-4" style={{ background: 'rgba(var(--primary-rgb), 0.03)' }}>
+                    <div className="flex-row items-center gap-4">
+                        <div className="p-3 bg-primary-light rounded-2xl text-primary">
+                            <Globe size={24} />
+                        </div>
+                        <div className="flex-col">
+                            <h3 className="text-sm font-bold text-main">Sincronización Centralizada</h3>
+                            <p className="text-xs text-muted font-medium">Las tareas creadas por cualquier miembro se sincronizarán con el calendario de la empresa.</p>
                         </div>
                     </div>
-
-                    <div className="flex-row gap-4" style={{ marginTop: '1.5rem', justifyContent: 'flex-end' }}>
-                        <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
-                            Cancelar
-                        </Button>
-                        <Button type="submit" variant="primary" isLoading={loadingAction}>
-                            {editingMemberId ? "Guardar Cambios" : "Registrar Miembro"}
-                        </Button>
+                    <div className="flex-row gap-2">
+                        <span className="pill text-[10px] bg-green-100 text-green-700 border-green-200">ACTIVO</span>
                     </div>
-                </form>
+                </Card>
+            )}
+
+            {/* Search & List */}
+            <div className="flex-col gap-4">
+                <div className="flex-row gap-3">
+                    <div className="card flex-row items-center gap-3 px-4 py-2 flex-1 max-w-md">
+                        <Search size={18} className="text-muted opacity-40" />
+                        <input 
+                            type="text" 
+                            placeholder="Buscar por nombre, email o área..." 
+                            className="text-sm font-medium bg-transparent border-none outline-none w-full"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredMembers.map((member) => (
+                        <Card key={member.id} className="p-5 flex-col gap-4 hover-lift group">
+                            <div className="flex-row justify-between items-start">
+                                <div className="flex-row gap-3 items-center">
+                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-200">
+                                        {member.name?.charAt(0) || <Users size={24} />}
+                                    </div>
+                                    <div className="flex-col">
+                                        <h3 className="text-base font-extrabold text-main leading-none">{member.name || "Sin nombre"}</h3>
+                                        <span className="text-xs font-semibold text-muted flex-row items-center gap-1 mt-1">
+                                            <Mail size={12} />
+                                            {member.email}
+                                        </span>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <MoreVertical size={16} />
+                                </Button>
+                            </div>
+
+                            <div className="flex-row gap-2 flex-wrap">
+                                <span className="pill text-[10px] font-black uppercase tracking-wider bg-sidebar text-main border-light">
+                                    {member.area || "General"}
+                                </span>
+                                <span className={`pill text-[10px] font-black uppercase tracking-wider border-none ${
+                                    member.role === 'CEO' ? 'bg-indigo-100 text-indigo-700' :
+                                    member.role === 'Admin' ? 'bg-purple-100 text-purple-700' :
+                                    'bg-slate-100 text-slate-700'
+                                }`}>
+                                    {member.role || "Miembro"}
+                                </span>
+                            </div>
+
+                            <div className="flex-row justify-between items-center mt-2 pt-4 border-t border-light">
+                                <span className="text-[10px] font-bold text-muted uppercase">Activo</span>
+                                <div className="flex-row gap-2">
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50">
+                                        <Trash2 size={14} />
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+
+            {/* Sync Modal */}
+            <Modal
+                isOpen={isSyncModalOpen}
+                onClose={() => setIsSyncModalOpen(false)}
+                title="Configuración de Calendario Global"
+            >
+                <div className="flex-col gap-6 p-2">
+                    <div className="flex-col gap-2">
+                        <p className="text-sm text-muted">
+                            Configura la cuenta de Google donde se centralizarán todas las tareas de <strong>{user?.company_name || 'la empresa'}</strong>.
+                        </p>
+                    </div>
+
+                    <div className="flex-row p-1 bg-sidebar rounded-xl gap-1">
+                        <button 
+                            onClick={() => setSyncMode('oauth')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${syncMode === 'oauth' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-main'}`}
+                        >
+                            Cuenta de Usuario (OAuth)
+                        </button>
+                        <button 
+                            onClick={() => setSyncMode('service')}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${syncMode === 'service' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-main'}`}
+                        >
+                            Cuenta de Servicio (JSON)
+                        </button>
+                    </div>
+
+                    {syncMode === 'oauth' ? (
+                        <div className="flex-col gap-4 py-4 items-center text-center">
+                            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-2">
+                                <Globe size={32} />
+                            </div>
+                            <div className="flex-col gap-2">
+                                <h4 className="text-sm font-bold text-main">Conectar mediante Google</h4>
+                                <p className="text-xs text-muted max-w-xs mx-auto">Vinculará el calendario de la cuenta admin actual como el centro de notificaciones global.</p>
+                            </div>
+                            <Button 
+                                variant="primary" 
+                                className="w-full flex-row gap-2 h-11"
+                                onClick={handleLinkSystemCalendar}
+                                isLoading={isSyncing}
+                            >
+                                <ExternalLink size={18} />
+                                Autenticar con Google
+                            </Button>
+                            <span className="text-[10px] text-muted font-medium flex-row gap-1 items-center">
+                                <Shield size={10} /> Conexión segura via OAuth2.0
+                            </span>
+                        </div>
+                    ) : (
+                        <div className="flex-col gap-4">
+                            <div className="flex-col gap-2">
+                                <label className="text-[10px] font-black uppercase text-muted tracking-widest">JSON de Credenciales</label>
+                                <textarea 
+                                    className="textarea min-h-[150px] text-[11px] font-mono leading-relaxed"
+                                    placeholder='{ "type": "service_account", ... }'
+                                    value={serviceAccountJson}
+                                    onChange={(e) => setServiceAccountJson(e.target.value)}
+                                />
+                                <p className="caption text-muted flex-row gap-1 items-center">
+                                    <AlertCircle size={10} /> Pega el contenido del archivo .json descargado de Google Cloud Console.
+                                </p>
+                            </div>
+                            <Button 
+                                variant="primary" 
+                                className="w-full h-11"
+                                onClick={handleSaveServiceAccount}
+                                isLoading={isConfiguring}
+                                disabled={!serviceAccountJson}
+                            >
+                                <Settings size={18} className="mr-2" />
+                                Guardar Configuración API
+                            </Button>
+                        </div>
+                    )}
+
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex-row gap-3">
+                        <div className="text-amber-500 shrink-0">
+                            <AlertCircle size={20} />
+                        </div>
+                        <div className="flex-col gap-1">
+                            <h5 className="text-xs font-black text-amber-800 uppercase">Aviso Importante</h5>
+                            <p className="text-[11px] text-amber-700 font-medium leading-relaxed">
+                                Esta configuración afecta a <strong>todos</strong> los miembros del equipo. Se recomienda usar una cuenta de Google corporativa dedicada.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

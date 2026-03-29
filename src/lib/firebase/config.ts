@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -21,4 +21,11 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const functions = getFunctions(app);
 
-export { app, auth, db, storage, functions };
+const googleProvider = new GoogleAuthProvider();
+// googleProvider.addScope('https://www.googleapis.com/auth/calendar');
+googleProvider.setCustomParameters({ 
+    prompt: 'consent',
+    access_type: 'offline'
+});
+
+export { app, auth, db, storage, functions, googleProvider };

@@ -15,12 +15,14 @@ export const taskActions = {
         console.log("taskActions.createTask - Payload:", { companyId, taskData });
         const defaultDueDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         const dueDate = taskData.dueDate || defaultDueDate;
+        const assignedEmails = Array.isArray(taskData.assignedEmails) ? taskData.assignedEmails : (taskData.assignedEmail ? [taskData.assignedEmail] : []);
         
         const taskRef = await addDoc(collection(db, 'tasks'), {
             ...taskData,
             dueDate,
             company_id: companyId,
-            assignedEmail: taskData.assignedEmail || null,
+            assignedEmails,
+            assignedEmail: assignedEmails[0] || null, // Keeping legacy field for compatibility
             recurrence: taskData.recurrence || { frequency: 'None' },
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
@@ -30,7 +32,7 @@ export const taskActions = {
         await addDoc(collection(db, `tasks/${taskRef.id}/log`), {
             action: 'CREACION',
             user: taskData.createdBy || 'Sistema',
-            details: `Tarea creada${taskData.assignedEmail ? ` y asignada a ${taskData.assignedEmail}` : ''}`,
+            details: `Tarea creada${assignedEmails.length > 0 ? ` y asignada a ${assignedEmails.join(', ')}` : ''}`,
             createdAt: serverTimestamp(),
         });
 
@@ -38,24 +40,27 @@ export const taskActions = {
         try {
             const { query, where, getDocs } = await import('firebase/firestore');
             
-            // Notify Assigned User by Email
-            if (taskData.assignedEmail) {
-                const userQuery = query(
-                    collection(db, 'users'),
-                    where('email', '==', taskData.assignedEmail),
-                    where('company_id', '==', companyId)
-                );
-                const userSnapshot = await getDocs(userQuery);
-                
-                if (!userSnapshot.empty) {
-                    const assignedUserId = userSnapshot.docs[0].id;
-                    await notificationActions.create(assignedUserId, {
-                        title: 'Se te ha asignado una tarea',
-                        message: `Has sido asignado a la tarea "${taskData.title}". Vence el: ${dueDate}`,
-                        type: 'TASK_ASSIGNED',
-                        link: `/dashboard/tasks/${taskRef.id}`
-                    });
-                }
+            // Notify ALL Assigned Users by Email
+            if (assignedEmails.length > 0) {
+                const notificationPromises = assignedEmails.map(async (email: string) => {
+                    const userQuery = query(
+                        collection(db, 'users'),
+                        where('email', '==', email),
+                        where('company_id', '==', companyId)
+                    );
+                    const userSnapshot = await getDocs(userQuery);
+                    
+                    if (!userSnapshot.empty) {
+                        const assignedUserId = userSnapshot.docs[0].id;
+                        return notificationActions.create(assignedUserId, {
+                            title: 'Se te ha asignado una tarea',
+                            message: `Has sido asignado a la tarea "${taskData.title}". Vence el: ${dueDate}`,
+                            type: 'TASK_ASSIGNED',
+                            link: `/dashboard/tasks/${taskRef.id}`
+                        });
+                    }
+                });
+                await Promise.all(notificationPromises);
             } else {
                 // Notify Area Users ONLY if no specific assignment was made
                 const usersQuery = query(
@@ -76,7 +81,7 @@ export const taskActions = {
                 await Promise.all(notificationPromises);
             }
         } catch (err) {
-            console.error("Error creating notifications for area users:", err);
+            console.error("Error creating notifications:", err);
         }
 
         return taskRef.id;
@@ -140,6 +145,7 @@ export const taskActions = {
 
     updateTask: async (taskId: string, taskData: any, log?: { action: string, user: string, details: string }) => {
         const taskRef = doc(db, 'tasks', taskId);
+        
         await updateDoc(taskRef, {
             ...taskData,
             updatedAt: serverTimestamp(),
@@ -154,8 +160,9 @@ export const taskActions = {
     },
 
     deleteTask: async (taskId: string) => {
+        const taskRef = doc(db, 'tasks', taskId);
         const { deleteDoc } = await import('firebase/firestore');
-        await deleteDoc(doc(db, 'tasks', taskId));
+        await deleteDoc(taskRef);
     }
 };
 
