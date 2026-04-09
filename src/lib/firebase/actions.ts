@@ -17,6 +17,14 @@ export const taskActions = {
         const dueDate = taskData.dueDate || defaultDueDate;
         const assignedEmails = Array.isArray(taskData.assignedEmails) ? taskData.assignedEmails : (taskData.assignedEmail ? [taskData.assignedEmail] : []);
         
+        console.log("taskActions.createTask - Final Payload to addDoc:", {
+            ...taskData,
+            dueDate,
+            company_id: companyId,
+            assignedEmails,
+            assignedEmail: assignedEmails[0] || null,
+        });
+
         const taskRef = await addDoc(collection(db, 'tasks'), {
             ...taskData,
             dueDate,

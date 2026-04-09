@@ -112,16 +112,6 @@ export default function TeamPage() {
                 </div>
                 
                 <div className="flex-row gap-3">
-                    {isCEO && (
-                        <Button 
-                            variant="outline" 
-                            className="flex-row gap-2"
-                            onClick={() => setIsSyncModalOpen(true)}
-                        >
-                            <Calendar size={18} />
-                            Vincular Google Calendar
-                        </Button>
-                    )}
                     <Button variant="primary" className="flex-row gap-2" onClick={() => setIsAddUserOpen(true)}>
                         <Plus size={18} />
                         Añadir Miembro
@@ -129,23 +119,6 @@ export default function TeamPage() {
                 </div>
             </div>
 
-            {/* Config Info Card (Admins Only) */}
-            {isCEO && (
-                <Card className="p-4 border-dashed border-2 flex-row items-center justify-between gap-4" style={{ background: 'rgba(var(--primary-rgb), 0.03)' }}>
-                    <div className="flex-row items-center gap-4">
-                        <div className="p-3 bg-primary-light rounded-2xl text-primary">
-                            <Globe size={24} />
-                        </div>
-                        <div className="flex-col">
-                            <h3 className="text-sm font-bold text-main">Sincronización Centralizada</h3>
-                            <p className="text-xs text-muted font-medium">Las tareas creadas por cualquier miembro se sincronizarán con el calendario de la empresa.</p>
-                        </div>
-                    </div>
-                    <div className="flex-row gap-2">
-                        <span className="pill text-[10px] bg-green-100 text-green-700 border-green-200">ACTIVO</span>
-                    </div>
-                </Card>
-            )}
 
             {/* Search & List */}
             <div className="flex-col gap-4">
@@ -209,96 +182,6 @@ export default function TeamPage() {
                 </div>
             </div>
 
-            {/* Sync Modal */}
-            <Modal
-                isOpen={isSyncModalOpen}
-                onClose={() => setIsSyncModalOpen(false)}
-                title="Configuración de Calendario Global"
-            >
-                <div className="flex-col gap-6 p-2">
-                    <div className="flex-col gap-2">
-                        <p className="text-sm text-muted">
-                            Configura la cuenta de Google donde se centralizarán todas las tareas de <strong>{user?.company_name || 'la empresa'}</strong>.
-                        </p>
-                    </div>
-
-                    <div className="flex-row p-1 bg-sidebar rounded-xl gap-1">
-                        <button 
-                            onClick={() => setSyncMode('oauth')}
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${syncMode === 'oauth' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-main'}`}
-                        >
-                            Cuenta de Usuario (OAuth)
-                        </button>
-                        <button 
-                            onClick={() => setSyncMode('service')}
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${syncMode === 'service' ? 'bg-card text-primary shadow-sm' : 'text-muted hover:text-main'}`}
-                        >
-                            Cuenta de Servicio (JSON)
-                        </button>
-                    </div>
-
-                    {syncMode === 'oauth' ? (
-                        <div className="flex-col gap-4 py-4 items-center text-center">
-                            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-2">
-                                <Globe size={32} />
-                            </div>
-                            <div className="flex-col gap-2">
-                                <h4 className="text-sm font-bold text-main">Conectar mediante Google</h4>
-                                <p className="text-xs text-muted max-w-xs mx-auto">Vinculará el calendario de la cuenta admin actual como el centro de notificaciones global.</p>
-                            </div>
-                            <Button 
-                                variant="primary" 
-                                className="w-full flex-row gap-2 h-11"
-                                onClick={handleLinkSystemCalendar}
-                                isLoading={isSyncing}
-                            >
-                                <ExternalLink size={18} />
-                                Autenticar con Google
-                            </Button>
-                            <span className="text-[10px] text-muted font-medium flex-row gap-1 items-center">
-                                <Shield size={10} /> Conexión segura via OAuth2.0
-                            </span>
-                        </div>
-                    ) : (
-                        <div className="flex-col gap-4">
-                            <div className="flex-col gap-2">
-                                <label className="text-[10px] font-black uppercase text-muted tracking-widest">JSON de Credenciales</label>
-                                <textarea 
-                                    className="textarea min-h-[150px] text-[11px] font-mono leading-relaxed"
-                                    placeholder='{ "type": "service_account", ... }'
-                                    value={serviceAccountJson}
-                                    onChange={(e) => setServiceAccountJson(e.target.value)}
-                                />
-                                <p className="caption text-muted flex-row gap-1 items-center">
-                                    <AlertCircle size={10} /> Pega el contenido del archivo .json descargado de Google Cloud Console.
-                                </p>
-                            </div>
-                            <Button 
-                                variant="primary" 
-                                className="w-full h-11"
-                                onClick={handleSaveServiceAccount}
-                                isLoading={isConfiguring}
-                                disabled={!serviceAccountJson}
-                            >
-                                <Settings size={18} className="mr-2" />
-                                Guardar Configuración API
-                            </Button>
-                        </div>
-                    )}
-
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex-row gap-3">
-                        <div className="text-amber-500 shrink-0">
-                            <AlertCircle size={20} />
-                        </div>
-                        <div className="flex-col gap-1">
-                            <h5 className="text-xs font-black text-amber-800 uppercase">Aviso Importante</h5>
-                            <p className="text-[11px] text-amber-700 font-medium leading-relaxed">
-                                Esta configuración afecta a <strong>todos</strong> los miembros del equipo. Se recomienda usar una cuenta de Google corporativa dedicada.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </Modal>
         </div>
     );
 }

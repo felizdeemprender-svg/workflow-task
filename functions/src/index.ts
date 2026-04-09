@@ -627,3 +627,4 @@ export const generalChat = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
 
 // Global Exports
 export * from "./calendarSync";
+export * from "./notifications";

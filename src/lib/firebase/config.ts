@@ -2,6 +2,8 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getMessaging } from "firebase/messaging";
+import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAXmwaUGwqTqkeeKqFMMSAjcBIHTMv39GU",
@@ -12,8 +14,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1001279364789:web:8e241897ba278ba80a28fc"
 };
 
-import { getFunctions } from "firebase/functions";
-
 // Initialize Firebase
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -21,7 +21,16 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const functions = getFunctions(app);
 
-const googleProvider = new GoogleAuthProvider();
-// googleProvider.addScope('https://www.googleapis.com/auth/calendar');
+// Messaging only works in the browser
+let messaging: any = null;
+if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+  try {
+    messaging = getMessaging(app);
+  } catch (e) {
+    console.error("Firebase messaging could not be initialized", e);
+  }
+}
 
-export { app, auth, db, storage, functions, googleProvider };
+const googleProvider = new GoogleAuthProvider();
+
+export { app, auth, db, storage, functions, messaging, googleProvider };

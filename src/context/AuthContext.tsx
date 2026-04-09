@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase/config";
 import { onAuthStateChanged, User, getIdTokenResult } from "firebase/auth";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { useFCM } from "@/hooks/useFCM";
 
 interface AuthUser extends User {
     company_id?: string;
@@ -29,6 +30,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [claims, setClaims] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+
+    useFCM(user?.uid);
 
     // Safe storage helper
     const safeStorage = {
