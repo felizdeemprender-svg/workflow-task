@@ -25,7 +25,7 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const router = useRouter();
-    const { setGoogleAccessToken } = useAuth();
+    const { user } = useAuth();
 
     const processAuthResult = useCallback(async (resultOrUser: UserCredential | { user: any }) => {
         const firebaseUser = resultOrUser.user;
@@ -55,15 +55,6 @@ export default function LoginPage() {
             updatedAt: serverTimestamp()
         };
 
-        // If we have a google token, save it to the user doc for persistence
-        if ('user' in resultOrUser && !('uid' in resultOrUser)) {
-            const credential = GoogleAuthProvider.credentialFromResult(resultOrUser as UserCredential);
-            if (credential?.accessToken) {
-                console.log("Saving Google token to Firestore for UID:", firebaseUser.uid);
-                updates.googleAccessToken = credential.accessToken;
-                setGoogleAccessToken(credential.accessToken);
-            }
-        }
 
         await setDoc(doc(db, "users", firebaseUser.uid), updates);
 

@@ -23,9 +23,5 @@ const functions = getFunctions(app);
 
 const googleProvider = new GoogleAuthProvider();
 // googleProvider.addScope('https://www.googleapis.com/auth/calendar');
-googleProvider.setCustomParameters({ 
-    prompt: 'consent',
-    access_type: 'offline'
-});
 
 export { app, auth, db, storage, functions, googleProvider };

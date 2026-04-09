@@ -78,7 +78,7 @@ export default function DashboardPage() {
             
             <div className="flex-row justify-between items-center stack-mobile">
                 <div>
-                    <h1 className="font-bold">¡Buen día, {user?.email?.split('@')[0]}!</h1>
+                    <h1 className="font-bold">¡Buen día, {user?.email?.split?.('@')?.[0] || 'Usuario'}!</h1>
                     <p className="text-muted">
                         Resumen de {user?.area || 'General'} • {user?.company_id ? `ID Empresa: ${user.company_id}` : 'Buscando empresa...'}
                     </p>
@@ -127,19 +127,47 @@ export default function DashboardPage() {
                     <ActivityChart />
                     
                     <Card title="Estado del Equipo" subtitle="Carga de trabajo por área">
-                        <div className="flex-row gap-4 flex-wrap">
-                            {['Administración', 'Ventas', 'Logística', 'Producción'].map(alt => (
-                                <div key={alt} className="flex-col gap-2 p-4 hover-scale" style={{ flex: 1, minWidth: '150px', borderRadius: '16px', background: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{alt}</span>
-                                    <div className="flex-row justify-between items-end">
-                                        <span style={{ fontSize: '1.25rem', fontWeight: 800 }}>{Math.floor(Math.random() * 10) + 2}</span>
-                                        <span style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 700 }}>+12%</span>
+                        <div className="flex-col gap-2">
+                            {(() => {
+                                const areas = ['General', 'Diseño', 'Ventas', 'Producción', 'Logística', 'Soporte', 'Marketing', 'Admin'];
+                                const areaCounts = areas.reduce((acc, area) => {
+                                    acc[area] = recentTasks.filter(t => t.area === area).length;
+                                    return acc;
+                                }, {} as Record<string, number>);
+
+                                const sortedAreas = [...areas].sort((a, b) => areaCounts[b] - areaCounts[a]);
+                                const maxArea = sortedAreas[0];
+                                const minArea = sortedAreas[sortedAreas.length - 1];
+
+                                return areas.map((area, idx) => (
+                                    <div key={area} className="flex-row items-center gap-4 p-3 rounded-xl hover:bg-main-light transition-all">
+                                        <div style={{ 
+                                            width: '12px', 
+                                            height: '12px', 
+                                            borderRadius: '3px', 
+                                            backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280', '#ec4899', '#06b6d4'][idx] 
+                                        }} />
+                                        <div className="flex-col" style={{ flex: 1 }}>
+                                            <div className="flex-row justify-between items-center">
+                                                <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>{area}</span>
+                                                <div className="flex-row items-center gap-2">
+                                                    <span style={{ fontSize: '1.25rem', fontWeight: 800 }}>{areaCounts[area]}</span>
+                                                    {area === maxArea && areaCounts[area] > 0 && <span style={{ fontSize: '0.65rem', color: '#10b981', fontWeight: 700 }}>MÁX</span>}
+                                                    {area === minArea && areaCounts[area] === 0 && <span style={{ fontSize: '0.65rem', color: '#6b7280', fontWeight: 700 }}>MÍN</span>}
+                                                </div>
+                                            </div>
+                                            <div style={{ height: '6px', backgroundColor: 'var(--bg-main)', borderRadius: '3px', marginTop: '4px', overflow: 'hidden' }}>
+                                                <div style={{ 
+                                                    width: `${Math.min((areaCounts[area] / (recentTasks.length || 1)) * 100, 100)}%`, 
+                                                    height: '100%', 
+                                                    backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280', '#ec4899', '#06b6d4'][idx],
+                                                    borderRadius: '3px'
+                                                }} />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style={{ width: '100%', height: '4px', background: 'rgba(0,0,0,0.05)', borderRadius: '2px', marginTop: '4px' }}>
-                                        <div style={{ width: `${Math.random() * 60 + 20}%`, height: '100%', background: 'var(--primary)', borderRadius: '2px' }} />
-                                    </div>
-                                </div>
-                            ))}
+                                ));
+                            })()}
                         </div>
                     </Card>
                 </div>

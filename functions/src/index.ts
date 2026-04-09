@@ -356,33 +356,39 @@ export const adminUpdateUser = functions.https.onCall(async (data, context) => {
  * Get personalized daily briefing using DeepSeek
  */
 export const getDailyBriefing = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).https.onCall(async (data, context) => {
-    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Auth required");
-    
-    const uid = context.auth.uid;
-    const userDoc = await getDb().collection("users").doc(uid).get();
-    const userData = userDoc.data();
-    if (!userData) throw new functions.https.HttpsError("not-found", "User not found");
-
-    // Fetch pending tasks
-    const tasksSnapshot = await getDb().collection("tasks")
-        .where("company_id", "==", userData.company_id)
-        .where("assignedEmail", "==", userData.email)
-        .where("status", "!=", "Finalizado")
-        .limit(10)
-        .get();
-
-    const tasks = tasksSnapshot.docs.map(d => ({ 
-        title: d.data().title, 
-        priority: d.data().priority || "Media",
-        dueDate: d.data().dueDate 
-    }));
-    const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-
-    if (!DEEPSEEK_API_KEY) {
-        return { briefing: `¡Hola ${userData.name || 'compañero'}! Tienes ${tasks.length} tareas pendientes. ¡A por todas!` };
-    }
-
     try {
+        if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Auth required");
+        
+        const uid = context.auth.uid;
+        const userDoc = await getDb().collection("users").doc(uid).get();
+        const userData = userDoc.data();
+        if (!userData) throw new functions.https.HttpsError("not-found", "User not found");
+
+        const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+
+        // Fetch pending tasks
+        let tasks: any[] = [];
+        try {
+            const tasksSnapshot = await getDb().collection("tasks")
+                .where("company_id", "==", userData.company_id)
+                .where("assignedEmail", "==", userData.email)
+                .where("status", "!=", "Finalizado")
+                .limit(10)
+                .get();
+            tasks = tasksSnapshot.docs.map(d => ({ 
+                title: d.data().title, 
+                priority: d.data().priority || "Media",
+                dueDate: d.data().dueDate 
+            }));
+        } catch (dbError) {
+            console.error("Database query error (likely missing index):", dbError);
+            // Fallback to simpler query or empty tasks
+        }
+
+        if (!DEEPSEEK_API_KEY) {
+            return { briefing: `¡Hola ${userData.name || userData.email?.split('@')[0] || 'compañero'}! Tienes ${tasks.length} tareas pendientes. ¡A por todas!` };
+        }
+
         const response = await axios.post("https://api.deepseek.com/v1/chat/completions", {
             model: "deepseek-chat",
             messages: [
@@ -402,7 +408,7 @@ export const getDailyBriefing = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
 
         return { briefing: response.data.choices[0].message.content };
     } catch (error) {
-        console.error("Briefing Error:", error);
+        console.error("Global Briefing Error:", error);
         return { briefing: "Hubo un problema al generar tu resumen, pero confío en que hoy será un gran día." };
     }
 });

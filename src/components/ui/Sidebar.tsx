@@ -220,7 +220,7 @@ export const Sidebar = () => {
                         </div>
                         {!isSidebarCollapsed && (
                             <div style={{ flex: 1, overflow: 'hidden' }} className="sidebar-text">
-                                <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email?.split('@')[0]}</p>
+                                <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email?.split?.('@')?.[0] || 'Usuario'}</p>
                                 <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{user?.role || 'Empleado'}</p>
                             </div>
                         )}

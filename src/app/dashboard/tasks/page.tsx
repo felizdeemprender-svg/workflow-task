@@ -316,7 +316,7 @@ export default function TasksPage() {
                                             border: '1px solid currentColor',
                                             background: (newTask.assignedEmails || []).includes(u.email) ? 'currentColor' : 'transparent'
                                         }} />
-                                        {u.name || u.email.split('@')[0]}
+                                        {u.name || u.email?.split?.('@')?.[0] || 'Miembro'}
                                     </div>
                                 ))}
                             </div>
@@ -548,8 +548,12 @@ export default function TasksPage() {
                                                                                         <div className="flex-row gap-1.5 items-center text-muted" style={{ fontSize: '0.65rem' }}>
                                                                                             <Users size={12} />
                                                                                             <span>
-                                                                                                {(task.assignedEmails || [task.assignedEmail])
-                                                                                                    .map((email: string) => companyUsers?.find((u: any) => u.email === email)?.name || email.split('@')[0])
+                                                                                                {(task.assignedEmails || (task.assignedEmail ? [task.assignedEmail] : []))
+                                                                                                    .map((email: string) => {
+                                                                                                        if (!email || typeof email !== 'string') return '';
+                                                                                                        return companyUsers?.find((u: any) => u.email === email)?.name || email.split('@')[0];
+                                                                                                    })
+                                                                                                    .filter(Boolean)
                                                                                                     .join(', ')}
                                                                                             </span>
                                                                                         </div>

@@ -17,24 +17,17 @@ interface AuthContextType {
     user: AuthUser | null;
     loading: boolean;
     claims: any;
-    googleAccessToken: string | null;
-    setGoogleAccessToken: (token: string | null) => void;
-    clearGoogleAccessToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
     claims: null,
-    googleAccessToken: null,
-    setGoogleAccessToken: () => {},
-    clearGoogleAccessToken: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [claims, setClaims] = useState<any>(null);
-    const [googleAccessToken, setGoogleAccessTokenState] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Safe storage helper
@@ -63,26 +56,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
-    const setGoogleAccessToken = (token: string | null) => {
-        setGoogleAccessTokenState(token);
-        if (token) {
-            safeStorage.setItem('google_access_token', token);
-        } else {
-            safeStorage.removeItem('google_access_token');
-        }
-    };
-
-    const clearGoogleAccessToken = async () => {
-        setGoogleAccessTokenState(null);
-        safeStorage.removeItem('google_access_token');
-        if (user?.uid) {
-            const { updateDoc, doc: fireDoc, serverTimestamp } = await import("firebase/firestore");
-            await updateDoc(fireDoc(db, "users", user.uid), {
-                googleAccessToken: null,
-                updatedAt: serverTimestamp()
-            });
-        }
-    };
 
     useEffect(() => {
         let unsubscribeUserDoc: () => void;
@@ -90,10 +63,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
             try {
                 if (firebaseUser) {
-                    // Try to load token from localStorage first, then Firestore
-                    const savedToken = safeStorage.getItem('google_access_token');
-                    if (savedToken) setGoogleAccessTokenState(savedToken);
-
                     // 1. Get initial token result for claims
                     const tokenResult = await getIdTokenResult(firebaseUser, true);
                     setClaims(tokenResult.claims);
@@ -102,12 +71,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     unsubscribeUserDoc = onSnapshot(doc(db, "users", firebaseUser.uid), (userSnapshot) => {
                         const userData = userSnapshot.exists() ? userSnapshot.data() : {};
                         
-                        // Fallback for token from Firestore if not in memory
-                        if (!googleAccessToken && userData.googleAccessToken) {
-                            console.log("Found Google token in Firestore");
-                            setGoogleAccessTokenState(userData.googleAccessToken);
-                        }
-
                         setUser({
                             ...firebaseUser,
                             company_id: (tokenResult.claims.company_id || userData.company_id) as string,
@@ -139,7 +102,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, claims, googleAccessToken, setGoogleAccessToken, clearGoogleAccessToken }}>
+        <AuthContext.Provider value={{ user, loading, claims }}>
             {children}
         </AuthContext.Provider>
     );

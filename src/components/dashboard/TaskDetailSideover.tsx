@@ -511,7 +511,7 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
                                                         gap: '0.2rem'
                                                     }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)' }}>{msg.sender === user?.email ? 'Tú' : (msg.sender === 'Bot' ? 'IA Assistant' : msg.sender.split('@')[0])}</span>
+                                                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)' }}>{msg.sender === user?.email ? 'Tú' : (msg.sender === 'Bot' ? 'IA Assistant' : (msg.sender?.split?.('@')?.[0] || 'Usuario'))}</span>
                                                         </div>
                                                         <div style={{
                                                             maxWidth: '92%',
