@@ -63,7 +63,7 @@ export default function LoginPage() {
             await deleteDoc(doc(db, "users", userDoc.id));
         }
         router.push("/dashboard");
-    }, [router, setGoogleAccessToken]);
+    }, [router]);
 
     useEffect(() => {
         const checkAuthStatus = async () => {
