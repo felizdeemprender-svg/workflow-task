@@ -36,11 +36,11 @@ export default function TeamPage() {
     // Edit User State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingMember, setEditingMember] = useState<any>(null);
-    const [editForm, setEditForm] = useState({ name: "", area: "", role: "" });
+    const [editForm, setEditForm] = useState({ name: "", area: "", role: "", initials: "" });
     const [isSaving, setIsSaving] = useState(false);
 
     // Add User State
-    const [newUserForm, setNewUserForm] = useState({ name: "", email: "", area: "General", role: "Employee", password: "" });
+    const [newUserForm, setNewUserForm] = useState({ name: "", email: "", area: "General", role: "Employee", password: "", initials: "" });
     const [isAdding, setIsAdding] = useState(false);
 
     // Chat State
@@ -128,10 +128,11 @@ export default function TeamPage() {
 
     const handleEditUser = (member: any) => {
         setEditingMember(member);
-        setEditForm({
-            name: member.name || "",
-            area: member.area || "General",
-            role: member.role || "Employee"
+        setEditForm({ 
+            name: member.name || "", 
+            area: member.area || "General", 
+            role: member.role || "Employee",
+            initials: member.initials || ""
         });
         setIsEditModalOpen(true);
     };
@@ -171,7 +172,7 @@ export default function TeamPage() {
                 accessibleAreas: [newUserForm.area]
             });
             toast.success("Miembro creado y activado correctamente");
-            setNewUserForm({ name: "", email: "", area: "General", role: "Employee", password: "" });
+            setNewUserForm({ name: "", email: "", area: "General", role: "Employee", password: "", initials: "" });
             setIsAddUserOpen(false);
         } catch (error: any) {
             console.error(error);
@@ -229,66 +230,108 @@ export default function TeamPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
                     {filteredMembers.map((member) => (
-                        <Card key={member.id} className="p-5 flex-col gap-4 hover-lift group">
-                            <div className="flex-row justify-between items-start">
-                                <div className="flex-row gap-3 items-center">
-                                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-200">
-                                        {member.name?.charAt(0) || <Users size={24} />}
-                                    </div>
-                                    <div className="flex-col">
-                                        <h3 className="text-base font-extrabold text-main leading-none">{member.name || "Sin nombre"}</h3>
-                                        <span className="text-xs font-semibold text-muted flex-row items-center gap-1 mt-1">
-                                            <Mail size={12} />
-                                            {member.email}
-                                        </span>
-                                    </div>
+                        <Card key={member.id} className="hover-lift group" style={{ padding: '1.5rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', flexDirection: 'row', gap: '1.25rem', alignItems: 'center' }}>
+                                {/* Avatar Circle - Fixed "Loose Letter" Issue */}
+                                <div style={{ 
+                                    width: '64px', 
+                                    height: '64px', 
+                                    borderRadius: '50%', 
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    fontSize: '1.5rem',
+                                    fontWeight: 900,
+                                    boxShadow: '0 10px 20px -5px rgba(79, 70, 229, 0.3)',
+                                    flexShrink: 0,
+                                    border: '4px solid white'
+                                }}>
+                                    {member.initials || member.name?.charAt(0).toUpperCase() || <Users size={24} />}
                                 </div>
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
-                                    onClick={() => handleEditUser(member)}
-                                >
-                                    <Settings size={14} className="text-muted" />
-                                </Button>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                                            {member.name || "Sin nombre"}
+                                        </h3>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-8 w-8 p-0"
+                                            onClick={() => handleEditUser(member)}
+                                            style={{ backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-light)', borderRadius: '10px' }}
+                                        >
+                                            <Settings size={14} className="text-muted" />
+                                        </Button>
+                                    </div>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Mail size={12} style={{ opacity: 0.5 }} />
+                                        {member.email}
+                                    </span>
+                                </div>
                             </div>
 
-                            <div className="flex-row gap-2 flex-wrap">
-                                <span className="pill text-[10px] font-black uppercase tracking-wider bg-sidebar text-main border-light">
+                            <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', flexWrap: 'wrap', marginTop: '1.25rem' }}>
+                                <span style={{ 
+                                    fontSize: '10px', 
+                                    fontWeight: 800, 
+                                    textTransform: 'uppercase', 
+                                    letterSpacing: '0.05em', 
+                                    backgroundColor: 'var(--bg-main)',
+                                    color: 'var(--text-main)',
+                                    padding: '4px 10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-light)'
+                                }}>
                                     {member.area || "General"}
                                 </span>
-                                <span className={`pill text-[10px] font-black uppercase tracking-wider border-none ${
-                                    member.role === 'CEO' ? 'bg-indigo-100 text-indigo-700' :
-                                    member.role === 'Admin' ? 'bg-purple-100 text-purple-700' :
-                                    'bg-slate-100 text-slate-700'
-                                }`}>
+                                <span style={{ 
+                                    fontSize: '10px', 
+                                    fontWeight: 800, 
+                                    textTransform: 'uppercase', 
+                                    letterSpacing: '0.05em', 
+                                    backgroundColor: member.role === 'Admin' || member.role === 'CEO' ? '#eef2ff' : '#f8fafc',
+                                    color: member.role === 'Admin' || member.role === 'CEO' ? '#4f46e5' : '#64748b',
+                                    padding: '4px 10px',
+                                    borderRadius: '8px'
+                                }}>
                                     {member.role || "Miembro"}
                                 </span>
                             </div>
 
-                            <div className="flex-row justify-between items-center mt-2 pt-4 border-t border-light">
-                                <span className="text-[10px] font-bold text-muted uppercase">Activo</span>
-                                <div className="flex-row gap-2">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-light)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                                    <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Activo</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'row', gap: '8px' }}>
                                     <Button 
                                         variant="ghost" 
                                         size="sm" 
-                                        className="h-8 w-8 p-0 text-primary hover:bg-indigo-50"
+                                        className="h-9 w-9 p-0"
                                         onClick={() => handleOpenChat(member)}
+                                        style={{ backgroundColor: '#f0fdf4', color: '#059669', borderRadius: '12px' }}
                                     >
-                                        <MessageCircle size={14} />
+                                        <MessageCircle size={16} />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50">
-                                        <Trash2 size={14} />
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-9 w-9 p-0"
+                                        style={{ backgroundColor: '#fef2f2', color: '#ef4444', borderRadius: '12px' }}
+                                    >
+                                        <Trash2 size={16} />
                                     </Button>
                                 </div>
                             </div>
                         </Card>
                     ))}
                 </div>
+   </div>
             </div>
 
             {/* Add Member Modal */}
@@ -298,15 +341,28 @@ export default function TeamPage() {
                 title="Añadir Nuevo Miembro"
             >
                 <div className="flex-col gap-5 py-4">
-                    <div className="flex-col gap-2">
-                        <label className="text-xs font-bold text-muted uppercase tracking-wider">Nombre Completo</label>
-                        <input 
-                            type="text" 
-                            className="premium-input w-full" 
-                            placeholder="Ej. Juan Pérez" 
-                            value={newUserForm.name}
-                            onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                        />
+                    <div className="grid-2">
+                        <div className="flex-col gap-2">
+                            <label className="text-xs font-bold text-muted uppercase tracking-wider">Nombre Completo</label>
+                            <input 
+                                type="text" 
+                                className="premium-input w-full" 
+                                placeholder="Ej. Juan Pérez" 
+                                value={newUserForm.name}
+                                onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex-col gap-2">
+                            <label className="text-xs font-bold text-muted uppercase tracking-wider">Inicial / Alias</label>
+                            <input 
+                                type="text" 
+                                className="premium-input w-full" 
+                                placeholder="Ej. JP" 
+                                maxLength={2}
+                                value={newUserForm.initials}
+                                onChange={(e) => setNewUserForm({ ...newUserForm, initials: e.target.value.toUpperCase() })}
+                            />
+                        </div>
                     </div>
 
                     <div className="flex-col gap-2">
@@ -374,15 +430,28 @@ export default function TeamPage() {
                 title="Editar Miembro de Equipo"
             >
                 <div className="flex-col gap-5 py-4">
-                    <div className="flex-col gap-2">
-                        <label className="text-xs font-bold text-muted uppercase tracking-wider">Nombre Completo</label>
-                        <input 
-                            type="text" 
-                            className="premium-input w-full" 
-                            placeholder="Nombre del empleado..." 
-                            value={editForm.name}
-                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        />
+                    <div className="grid-2">
+                        <div className="flex-col gap-2">
+                            <label className="text-xs font-bold text-muted uppercase tracking-wider">Nombre Completo</label>
+                            <input 
+                                type="text" 
+                                className="premium-input w-full" 
+                                placeholder="Nombre del empleado..." 
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex-col gap-2">
+                            <label className="text-xs font-bold text-muted uppercase tracking-wider">Inicial / Alias</label>
+                            <input 
+                                type="text" 
+                                className="premium-input w-full" 
+                                placeholder="Ej. JP" 
+                                maxLength={2}
+                                value={editForm.initials}
+                                onChange={(e) => setEditForm({ ...editForm, initials: e.target.value.toUpperCase() })}
+                            />
+                        </div>
                     </div>
 
                     <div className="grid-2">

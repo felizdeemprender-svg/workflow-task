@@ -183,7 +183,7 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", "No tiene permisos para crear usuarios.");
     }
 
-    const { email, password, company_id, role, area, accessibleAreas, name, phone } = data;
+    const { email, password, company_id, role, area, accessibleAreas, name, phone, initials } = data;
 
     // 3. Validation
     if (!email || !password || !company_id || !role) {
@@ -200,7 +200,7 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
         const userRecord = await getAuth().createUser({
             email,
             password,
-            displayName: email.split("@")[0],
+            displayName: initials || name || email.split("@")[0],
         });
 
         const newUserId = userRecord.uid;
@@ -220,6 +220,7 @@ export const adminCreateUser = functions.https.onCall(async (data, context) => {
             area: area || "General",
             accessibleAreas: Array.isArray(accessibleAreas) ? accessibleAreas : [area || "General"],
             name: name || "",
+            initials: initials || "",
             phone: phone || "",
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -251,7 +252,7 @@ export const adminInviteUser = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", "No tiene permisos para invitar usuarios.");
     }
 
-    const { email, company_id, role, area, accessibleAreas, name } = data;
+    const { email, company_id, role, area, accessibleAreas, name, initials } = data;
 
     // 3. Validation
     if (!email || !company_id || !role) {
@@ -273,6 +274,7 @@ export const adminInviteUser = functions.https.onCall(async (data, context) => {
             area: area || "General",
             accessibleAreas: Array.isArray(accessibleAreas) ? accessibleAreas : [area || "General"],
             name: name || "",
+            initials: initials || "",
             status: "invited",
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -302,7 +304,7 @@ export const adminUpdateUser = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError("permission-denied", "No tiene permisos para editar usuarios.");
     }
 
-    const { targetUid, role, area, accessibleAreas, password, name, phone } = data;
+    const { targetUid, role, area, accessibleAreas, password, name, phone, initials } = data;
 
     if (!targetUid) {
         throw new functions.https.HttpsError("invalid-argument", "Falta el ID del usuario a editar (targetUid).");
@@ -342,6 +344,7 @@ export const adminUpdateUser = functions.https.onCall(async (data, context) => {
         if (role) updates.role = role;
         if (area) updates.area = area;
         if (name) updates.name = name;
+        if (initials !== undefined) updates.initials = initials;
         if (phone) updates.phone = phone;
         if (accessibleAreas) updates.accessibleAreas = accessibleAreas;
 
