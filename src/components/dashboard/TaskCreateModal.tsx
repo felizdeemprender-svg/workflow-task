@@ -227,7 +227,8 @@ export const TaskCreateModal = ({
                                 height: '32px', 
                                 padding: '0', 
                                 borderRadius: '10px',
-                                color: 'var(--cu-text-light)'
+                                color: 'var(--cu-text-light)',
+                                marginRight: '2.5rem'
                             }}
                         >
                             <X size={20} />

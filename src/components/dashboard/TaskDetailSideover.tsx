@@ -305,7 +305,7 @@ export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: Task
                                 <CheckCircle2 size={24} className="text-primary" />
                                 <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.025em' }}>Tarea</h2>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={onClose} style={{ borderRadius: '12px', padding: '0.6rem' }}>
+                            <Button variant="ghost" size="sm" onClick={onClose} style={{ borderRadius: '12px', padding: '0.6rem', marginRight: '2.5rem' }}>
                                 <X size={20} />
                             </Button>
                         </div>
