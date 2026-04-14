@@ -65,8 +65,11 @@ export const Sidebar = () => {
                 left: 0,
                 top: 0,
                 zIndex: 100,
-                transition: 'width var(--transition-speed), padding var(--transition-speed)'
+                transition: 'width var(--transition-speed), padding var(--transition-speed)',
+                overflowY: 'auto',
+                overflowX: 'hidden'
             }}
+            className="sidebar-transition sidebar-scroll"
         >
             <div style={{ 
                 display: 'flex', 
