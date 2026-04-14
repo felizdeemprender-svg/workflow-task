@@ -18,8 +18,11 @@ import {
     Menu,
     ChevronLeft,
     Sun,
-    Moon
+    Moon,
+    Archive,
+    BookOpen
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 
@@ -34,6 +37,8 @@ export const Sidebar = () => {
         { name: "Equipo", icon: Users, href: "/dashboard/team" },
         { name: "Encuestas", icon: PieChart, href: "/dashboard/polls" },
         { name: "Calendario", icon: Calendar, href: "/dashboard/calendar" },
+        { name: "Cuaderno", icon: BookOpen, href: "/dashboard/notebook" },
+        { name: "Archivo", icon: Archive, href: "/dashboard/archives" },
     ];
 
     if (user?.email === 'felizdeemprender@gmail.com') {
@@ -98,26 +103,22 @@ export const Sidebar = () => {
                     </div>
                 )}
                 
-                <button 
+                <Button 
+                    variant="ghost" 
+                    size="sm"
                     onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
                     style={{
                         background: 'rgba(255,255,255,0.05)',
-                        border: 'none',
                         color: 'rgba(255,255,255,0.6)',
-                        padding: '6px',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: isSidebarCollapsed ? '28px' : 'auto',
+                        width: isSidebarCollapsed ? '28px' : '32px',
+                        height: '28px',
                         alignSelf: isSidebarCollapsed ? 'center' : 'flex-end',
-                        marginTop: !isSidebarCollapsed ? '-42px' : '0' // Pull up next to logo on desktop
+                        marginTop: !isSidebarCollapsed ? '-42px' : '0'
                     }}
                     className="mobile-hamburger-adjust hide-mobile"
                 >
                     {isSidebarCollapsed ? <Menu size={isSidebarCollapsed ? 16 : 18} /> : <ChevronLeft size={18} />}
-                </button>
+                </Button>
 
                 </div>
 
@@ -185,7 +186,8 @@ export const Sidebar = () => {
                     background: 'rgba(255,255,255,0.03)',
                     overflow: 'hidden'
                 }} className="sidebar-footer">
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={toggleDarkMode}
                         style={{
                             display: 'flex',
@@ -193,12 +195,8 @@ export const Sidebar = () => {
                             justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
                             gap: '0.75rem',
                             padding: '0.65rem 0.75rem',
-                            borderRadius: '8px',
                             color: 'rgba(255,255,255,0.6)',
                             backgroundColor: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
                             width: '100%',
                             fontSize: '0.8rem'
                         }}
@@ -206,7 +204,7 @@ export const Sidebar = () => {
                     >
                         {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                         {!isSidebarCollapsed && <span className="sidebar-text">{isDarkMode ? "Modo Claro" : "Modo Oscuro"}</span>}
-                    </button>
+                    </Button>
 
                     <div style={{ 
                         height: '1px', 
@@ -226,7 +224,8 @@ export const Sidebar = () => {
                         )}
                     </div>
 
-                    <button 
+                    <Button 
+                        variant="danger"
                         onClick={() => signOut(auth)}
                         style={{
                             display: 'flex',
@@ -235,20 +234,17 @@ export const Sidebar = () => {
                             gap: '0.75rem',
                             padding: '0.5rem',
                             marginTop: '0.5rem',
-                            borderRadius: '8px',
                             color: '#fb7185',
                             backgroundColor: 'rgba(251, 113, 133, 0.1)',
-                            border: 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
                             width: '100%',
                             fontSize: '0.85rem',
-                            fontWeight: 600
+                            fontWeight: 600,
+                            border: 'none'
                         }}
                     >
                         <LogOut size={18} />
                         {!isSidebarCollapsed && <span className="sidebar-text">Cerrar Sesión</span>}
-                    </button>
+                    </Button>
                 </div>
             </div>
         </aside>

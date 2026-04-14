@@ -80,7 +80,7 @@ export function ActivityChart() {
         </div>
       </div>
 
-      <div style={{ flex: 1, width: '100%', marginTop: '1rem' }}>
+      <div style={{ flex: 1, width: '100%', marginTop: '1rem', minHeight: 0, position: 'relative' }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
             <defs>

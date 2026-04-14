@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { messaging, db } from '../lib/firebase/config';
 import { getToken, onMessage } from 'firebase/messaging';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, arrayUnion } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 export const useFCM = (userId: string | undefined) => {
@@ -22,12 +22,16 @@ export const useFCM = (userId: string | undefined) => {
             vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY 
           });
 
-          if (currentToken) {
-            setFcmToken(currentToken);
-            // Save token to user profile
-            await setDoc(doc(db, 'users', userId), { fcmToken: currentToken }, { merge: true });
-            console.log('FCM Token stored successfully');
-          } else {
+            if (currentToken) {
+              setFcmToken(currentToken);
+              // Save token to user profile - using arrayUnion to support multiple devices
+              // Use setDoc with merge:true to ensure it works even if the document doesn't exist
+              await setDoc(doc(db, 'users', userId), { 
+                fcmTokens: arrayUnion(currentToken),
+                fcmToken: currentToken // legacy support
+              }, { merge: true });
+              console.log('FCM Token stored successfully');
+            } else {
             console.log('No registration token available. Request permission to generate one.');
           }
         } else {

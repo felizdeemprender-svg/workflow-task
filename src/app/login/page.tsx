@@ -243,19 +243,14 @@ export default function LoginPage() {
 
 
                 <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
-                    <button
+                    <Button
+                        variant="ghost"
                         onClick={() => setIsRegister(!isRegister)}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--primary)',
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                        }}
+                        className="text-primary font-bold"
+                        style={{ fontSize: '0.875rem' }}
                     >
                         {isRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿Eres nuevo? Crea una cuenta"}
-                    </button>
+                    </Button>
                 </div>
             </Card>
         </div>

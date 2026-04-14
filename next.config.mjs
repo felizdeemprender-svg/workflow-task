@@ -8,10 +8,17 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Habilitar exportación estática para Firebase Hosting (Clásico)
+  output: 'export',
   images: {
     unoptimized: true,
   },
-  trailingSlash: true,
+  trailingSlash: false,
+  // Limitar trabajadores para evitar errores de memoria (OOM) en el build
+  experimental: {
+    workerThreads: false,
+    cpus: 1
+  },
   async headers() {
     return [
       {

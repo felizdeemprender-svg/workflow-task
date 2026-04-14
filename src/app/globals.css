@@ -24,9 +24,9 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-standard: 0 2px 4px rgba(0, 0, 0, 0.04), 0 4px 6px -1px rgba(0, 0, 0, 0.03);
   
-  --radius-standard: 6px;
-  --radius-lg: 8px;
-  --radius-pill: 8px;
+  --radius-standard: 12px;
+  --radius-lg: 14px;
+  --radius-pill: 9999px;
 
   --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
   
@@ -36,15 +36,15 @@
   --sidebar-collapsed-w: 52px;
 
   --main-p: 1.5rem;
-  --card-p: 1rem;
+  --card-p: 1.25rem;
   --pill-p: 0.2rem 0.6rem;
   
   --font-xs: 0.7rem;
   --font-sm: 0.8rem;
   --font-base: 0.85rem;
 
-  --radius-premium: 8px;
-  --shadow-premium: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --radius-premium: 14px;
+  --shadow-premium: 0 10px 30px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
 @media (max-width: 768px) {
@@ -107,7 +107,7 @@
 html,
 body,
 #root,
-#__next {
+#_next {
   max-width: 100vw !important;
   overflow-x: hidden !important;
   position: relative !important;
@@ -211,11 +211,21 @@ a {
   -webkit-backdrop-filter: blur(12px);
   border-radius: var(--radius-premium);
   border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-premium);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   max-width: 100% !important;
   min-width: 0 !important;
   overflow: hidden !important;
+}
+
+.card-pill {
+  background-color: rgba(var(--bg-main-rgb), 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-light);
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
 }
 
 .pill {
@@ -237,7 +247,7 @@ a {
   padding: 0.875rem 1rem;
   background-color: var(--bg-main);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-standard);
   color: var(--text-main);
   font-size: 0.925rem;
   transition: all 0.2s ease;
@@ -463,4 +473,107 @@ h3 {
 
 .sidebar-transition {
   transition: width var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1), margin var(--transition-speed);
+}
+
+/* Global Button & UI Overrides to prevent "Square & Black" defaults */
+input:not([type="image" i], [type="range" i], [type="checkbox" i], [type="radio" i]),
+textarea,
+select {
+  border: 1px solid var(--border-light) !important;
+  outline: none !important;
+  background-color: transparent;
+  color: inherit;
+  font-family: inherit;
+}
+
+*:focus {
+  outline: none !important;
+}
+
+button {
+  font-family: var(--font-inter) !important;
+  border: none;
+  border-radius: var(--radius-premium);
+  outline: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border-radius: var(--radius-premium) !important;
+  cursor: pointer;
+  border: none !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  color: inherit;
+  font-family: var(--font-inter);
+}
+
+.btn-md {
+  padding: 0.65rem 1.25rem;
+  font-size: 0.85rem;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+}
+
+.btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%) !important;
+  color: white !important;
+  box-shadow: 0 8px 20px -4px rgba(99, 102, 241, 0.3) !important;
+}
+
+.btn-secondary {
+  background-color: var(--primary-light) !important;
+  color: var(--primary) !important;
+  border: none !important;
+}
+
+.btn-outline {
+  background-color: transparent !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-light) !important;
+}
+
+.btn-ghost {
+  background-color: transparent !important;
+  color: var(--text-muted) !important;
+  border: none !important;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(var(--bg-main-rgb), 0.05) !important;
+  color: var(--text-main) !important;
+}
+
+.btn-danger {
+  background-color: #ef4444 !important;
+  color: white !important;
+  box-shadow: 0 8px 20px -4px rgba(239, 68, 68, 0.3) !important;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

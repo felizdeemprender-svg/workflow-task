@@ -12,15 +12,16 @@ import { db } from '@/lib/firebase/config';
 export function useFirestoreQuery<T = DocumentData>(
     collectionName: string,
     constraints: QueryConstraint[] = [],
-    enabled: boolean = true
+    enabled: boolean = true,
+    deps: any[] = []
 ) {
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(enabled);
     const [error, setError] = useState<Error | null>(null);
 
-    // Simplified key for constraints to avoid [object Object] issues
-    // Using length and the enabled flag as a proxy for changes in this specific app's patterns
-    const constraintsKey = `${collectionName}-${enabled}-${constraints.length}`;
+    // Track constraints more reliably. Use a simpler hash for the key.
+    const [retryCount, setRetryCount] = useState(0);
+    const constraintsKey = `${collectionName}-${enabled}-${constraints.length}-${retryCount}-${deps.join(",")}`;
 
     useEffect(() => {
         if (!collectionName || !enabled) {
@@ -47,10 +48,11 @@ export function useFirestoreQuery<T = DocumentData>(
                     setLoading(false);
                 },
                 (err) => {
-                    // Fail silently for standard permission errors during auth transitions
                     if (err.code === 'permission-denied') {
-                        console.warn(`Permission denied for ${collectionName}. Waiting for auth sync...`);
-                    } else {
+                        if (retryCount < 2) {
+                            setTimeout(() => setRetryCount(p => p + 1), 2000);
+                        }
+                    } else if (process.env.NODE_ENV === 'development') {
                         console.error(`Error in useFirestoreQuery (${collectionName}):`, err);
                     }
                     setError(err);

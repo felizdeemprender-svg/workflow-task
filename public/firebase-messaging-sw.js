@@ -15,12 +15,36 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification.title || "Nueva Notificación";
+  // Support both notification object (automatic) and data object (manual)
+  const notificationTitle = payload.notification?.title || payload.data?.title || "Nueva Notificación";
   const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/logo.png', // Fallback if logo exists
-    data: payload.data
+    body: payload.notification?.body || payload.data?.body || '',
+    icon: '/logo.png',
+    data: payload.data || payload.notification
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  
+  const targetUrl = event.notification.data?.url || 'https://workflow-project-studio.web.app/dashboard';
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Si el navegador ya tiene la app abierta, hacemos focus
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if ('focus' in client && client.url.includes(self.location.origin)) {
+           client.navigate(targetUrl); // Opcional: Navegar a la tarea si ya está abierta
+           return client.focus();
+        }
+      }
+      // Si no hay ninguna ventana abierta de la app, abrimos una nueva
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
 });

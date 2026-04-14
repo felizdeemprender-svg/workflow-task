@@ -18,18 +18,21 @@ interface AuthContextType {
     user: AuthUser | null;
     loading: boolean;
     claims: any;
+    isAuthSynced: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
     claims: null,
+    isAuthSynced: false,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [claims, setClaims] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [isAuthSynced, setIsAuthSynced] = useState(false);
 
     useFCM(user?.uid);
 
@@ -66,8 +69,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
             try {
                 if (firebaseUser) {
-                    // 1. Get initial token result for claims
-                    const tokenResult = await getIdTokenResult(firebaseUser, true);
+                    // 1. Get initial token result for claims (passive refresh)
+                    const tokenResult = await getIdTokenResult(firebaseUser);
                     setClaims(tokenResult.claims);
 
                     // 2. Real-time listener for user profile
@@ -82,6 +85,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                             accessibleAreas: userData.accessibleAreas || (userData.area ? [userData.area] : []),
                             spiritPoints: userData.spiritPoints || 0,
                         });
+                        setIsAuthSynced(true);
                         setLoading(false);
                     }, (error) => {
                         console.error("AuthContext - Error listening to user doc:", error);
@@ -90,6 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 } else {
                     setUser(null);
                     setClaims(null);
+                    setIsAuthSynced(true);
                     setLoading(false);
                 }
             } catch (err) {
@@ -105,7 +110,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, claims }}>
+        <AuthContext.Provider value={{ user, loading, claims, isAuthSynced }}>
             {children}
         </AuthContext.Provider>
     );

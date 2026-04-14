@@ -14,10 +14,19 @@ import { useAuth } from "@/context/AuthContext";
 import { useFirestoreQuery } from "@/hooks/useFirestoreQuery";
 import { where, orderBy, limit } from "firebase/firestore";
 import Link from "next/link";
-import { ActivityChart } from "@/components/dashboard/ActivityChart";
-import { SmartBriefing } from "@/components/dashboard/SmartBriefing";
-import { AICommandBar } from "@/components/dashboard/AICommandBar";
-import { Sparkline } from "@/components/ui/Sparkline";
+import dynamic from "next/dynamic";
+
+// Dynamic imports for heavy components
+const ActivityChart = dynamic(() => import("@/components/dashboard/ActivityChart").then(mod => mod.ActivityChart), { 
+    loading: () => <div className="card animate-pulse" style={{ height: '300px', background: 'var(--bg-main)', opacity: 0.5 }} />
+});
+const SmartBriefing = dynamic(() => import("@/components/dashboard/SmartBriefing").then(mod => mod.SmartBriefing), {
+    loading: () => <div className="card animate-pulse" style={{ height: '100px', background: 'var(--bg-main)', opacity: 0.5 }} />
+});
+const Sparkline = dynamic(() => import("@/components/ui/Sparkline").then(mod => mod.Sparkline), {
+    ssr: false
+});
+const AICommandBar = dynamic(() => import("@/components/dashboard/AICommandBar").then(mod => mod.AICommandBar));
 
 export default function DashboardPage() {
     const { user } = useAuth();
@@ -39,26 +48,28 @@ export default function DashboardPage() {
     const { data: recentTasks, loading: tasksLoading } = useFirestoreQuery<any>(
         'tasks',
         taskConstraints,
-        !!user?.company_id
+        !!user?.company_id,
+        [user?.company_id]
     );
 
     const { data: activePolls, loading: pollsLoading } = useFirestoreQuery<any>(
         'polls',
         pollConstraints,
-        !!user?.company_id
+        !!user?.company_id,
+        [user?.company_id]
     );
 
     const stats = [
         { 
             name: "Tareas Activas", 
-            value: recentTasks.filter(t => t.status !== 'Finalizado').length.toString(), 
+            value: recentTasks.filter(t => t.status !== 'Finalizada').length.toString(), 
             icon: Clock, 
             color: "#f59e0b",
             trend: [4, 6, 5, 8, 7, 9, 8] // Mocked trend
         },
         { 
             name: "Completadas", 
-            value: recentTasks.filter(t => t.status === 'Finalizado').length.toString(), 
+            value: recentTasks.filter(t => t.status === 'Finalizada').length.toString(), 
             icon: CheckCircle2, 
             color: "#10b981",
             trend: [2, 3, 5, 4, 6, 8, 10] // Mocked trend
@@ -206,7 +217,7 @@ export default function DashboardPage() {
                                     </Link>
                                 ))}
                                 <Link href="/dashboard/tasks" style={{ width: '100%' }}>
-                                    <Button variant="secondary" style={{ width: '100%', marginTop: '0.5rem' }}>Ver todo</Button>
+                                    <Button variant="secondary" style={{ width: '100%' }}>Ver todo</Button>
                                 </Link>
                             </div>
                         )}
@@ -228,7 +239,7 @@ export default function DashboardPage() {
                                     ))}
                                 </div>
                                 <Link href="/dashboard/polls">
-                                    <Button size="sm" style={{ width: '100%', marginTop: '0.5rem' }}>Votar ahora</Button>
+                                    <Button variant="primary" style={{ width: '100%' }}>Votar ahora</Button>
                                 </Link>
                             </div>
                         ) : (

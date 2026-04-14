@@ -17,42 +17,86 @@ import { useAuth } from "@/context/AuthContext";
 import { useFirestoreQuery } from "@/hooks/useFirestoreQuery";
 import { taskActions, notificationActions } from "@/lib/firebase/actions";
 import { db } from "@/lib/firebase/config";
-import { doc, onSnapshot, orderBy, collection, serverTimestamp } from "firebase/firestore";
+import { doc, onSnapshot, orderBy, where, serverTimestamp } from "firebase/firestore";
 import { aiService } from "@/lib/ai/service";
+import { toast } from "sonner";
+import { Trash2, CheckCircle2 } from "lucide-react";
 
 export default function TaskDetailClient() {
     const { id } = useParams();
-    const { user } = useAuth();
+    const { user, isAuthSynced } = useAuth();
     const [task, setTask] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+    const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Real-time task data
     useEffect(() => {
-        if (!id) return;
-        const unsubscribe = onSnapshot(doc(db, "tasks", id as string), (doc) => {
-            setTask({ id: doc.id, ...doc.data() });
-            setLoading(false);
-        });
+        if (!id || !isAuthSynced) return;
+        const unsubscribe = onSnapshot(
+            doc(db, "tasks", id as string), 
+            (doc) => {
+                if (doc.exists()) {
+                    setTask({ id: doc.id, ...doc.data() });
+                } else {
+                    setTask(null);
+                }
+                setLoading(false);
+            },
+            (err) => {
+                console.error("Error fetching task:", err);
+                if (err.code !== 'permission-denied') {
+                    setLoading(false);
+                }
+            }
+        );
         return () => unsubscribe();
-    }, [id]);
+    }, [id, isAuthSynced]);
 
     // Real-time chat messages
     const chatConstraints = React.useMemo(() => [orderBy("createdAt", "asc")], []);
-    const { data: messages } = useFirestoreQuery<any>(
-        `tasks/${id}/chat`,
+    const { data: messages = [] } = useFirestoreQuery<any>(
+        id ? `tasks/${id}/chat` : "",
         chatConstraints,
-        !!user?.company_id
+        isAuthSynced && !!id
     );
 
     // Real-time logs
     const logConstraints = React.useMemo(() => [orderBy("createdAt", "desc")], []);
-    const { data: logs } = useFirestoreQuery<any>(
-        `tasks/${id}/log`,
+    const { data: logs = [] } = useFirestoreQuery<any>(
+        id ? `tasks/${id}/log` : "",
         logConstraints,
-        !!user?.company_id
+        isAuthSynced && !!id
+    );
+
+    // Subtasks query
+    const subtasksConstraints = React.useMemo(() => 
+        (id && user?.company_id) ? [
+            where('parentId', '==', id),
+            where('company_id', '==', user.company_id)
+        ] : [],
+        [id, user?.company_id]
+    );
+    const { data: subtasks = [] } = useFirestoreQuery<any>(
+        'tasks',
+        subtasksConstraints,
+        isAuthSynced && !!id && !!user?.company_id,
+        [id, user?.company_id]
+    );
+
+    // Company users for assignment
+    const usersConstraints = React.useMemo(() =>
+        user?.company_id ? [where('company_id', '==', user.company_id)] : [],
+        [user?.company_id]
+    );
+    const { data: companyUsers = [] } = useFirestoreQuery<any>(
+        'users', 
+        usersConstraints, 
+        isAuthSynced && !!user?.company_id
     );
 
     const priorityColors: Record<string, string> = {
@@ -82,11 +126,86 @@ export default function TaskDetailClient() {
     };
 
     const handleStatusChange = async (newStatus: string) => {
-        if (!user) return;
+        if (!user || !id) return;
+        setIsSaving(true);
         try {
             await taskActions.updateStatus(id as string, newStatus, user.email || "Usuario");
+            toast.success("Estado actualizado");
         } catch (error) {
             console.error("Error updating status:", error);
+            toast.error("Error al actualizar estado");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleToggleSubtaskStatus = async (st: any) => {
+        if (!st.id || !user) return;
+        const newStatus = st.status === "Finalizada" ? "Pendiente" : "Finalizada";
+        try {
+            await taskActions.updateStatus(st.id, newStatus, user.uid);
+            toast.success(`Subtarea marcada como ${newStatus}`);
+        } catch (error) {
+            console.error("Error toggling subtask status:", error);
+            toast.error("Error al actualizar el estado");
+        }
+    };
+
+    const handleDeleteSubtask = async (stId: string) => {
+        if (!stId) return;
+        if (!confirm("¿Eliminar esta subtarea?")) return;
+        try {
+            await taskActions.deleteTask(stId);
+            toast.success("Subtarea eliminada");
+        } catch (error) {
+            console.error("Error deleting subtask:", error);
+            toast.error("Error al eliminar la subtarea");
+        }
+    };
+
+    const handleAddSubtask = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newSubtaskTitle.trim() || isAddingSubtask || !id || !user) return;
+        
+        setIsAddingSubtask(true);
+        try {
+            await taskActions.createTask(user.company_id, {
+                title: newSubtaskTitle.trim(),
+                description: "",
+                status: "Pendiente",
+                priority: "Media",
+                area: task.area || "General",
+                parentId: id as string,
+                createdBy: user.email,
+                assignedEmails: []
+            });
+            setNewSubtaskTitle("");
+            toast.success("Subtarea añadida");
+        } catch (error) {
+            console.error("Error adding subtask:", error);
+            toast.error("Error al añadir la subtarea");
+        } finally {
+            setIsAddingSubtask(false);
+        }
+    };
+
+    const handleToggleAssignment = async (email: string) => {
+        if (!id || !task || !user) return;
+        const emails = task.assignedEmails || (task.assignedEmail ? [task.assignedEmail] : []);
+        const newEmails = emails.includes(email) 
+            ? emails.filter((e: string) => e !== email)
+            : [...emails, email];
+        
+        try {
+            await taskActions.updateTask(id as string, { assignedEmails: newEmails }, {
+                action: 'ASIGNACIÓN',
+                user: user.email || 'Sistema',
+                details: emails.includes(email) ? `Quitado: ${email}` : `Asignado: ${email}`
+            });
+            toast.success("Equipo actualizado");
+        } catch (error) {
+            console.error("Error updating assignment:", error);
+            toast.error("Error al actualizar asignación");
         }
     };
 
@@ -166,7 +285,8 @@ export default function TaskDetailClient() {
                     >
                         <option>Pendiente</option>
                         <option>En Proceso</option>
-                        <option>Finalizado</option>
+                        <option>🔴 Urgente</option>
+                        <option>Finalizada</option>
                     </select>
                 </div>
             </div>
@@ -174,9 +294,116 @@ export default function TaskDetailClient() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem', alignItems: 'start' }}>
                 <div className="flex-col gap-6">
                     <Card title="Descripción">
-                        <p className="text-muted" style={{ lineHeight: '1.6' }}>
-                            {task.description}
+                        <p className="text-muted" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                            {task.description || "Sin descripción proporcionada."}
                         </p>
+                    </Card>
+
+                    <Card title="Subtareas">
+                        <div className="flex-col gap-4">
+                            <div className="flex-row justify-between items-center" style={{ marginBottom: '0.5rem' }}>
+                                <div className="flex-row items-center gap-2">
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>Progreso</span>
+                                </div>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                    {subtasks.filter((st: any) => st.status === 'Finalizada').length} / {subtasks.length}
+                                </span>
+                            </div>
+
+                            {subtasks.length > 0 && (
+                                <div style={{ 
+                                    width: '100%', 
+                                    height: '6px', 
+                                    backgroundColor: 'var(--border-light)', 
+                                    borderRadius: '3px',
+                                    overflow: 'hidden',
+                                    marginBottom: '1rem'
+                                }}>
+                                    <div 
+                                        style={{ 
+                                            height: '100%', 
+                                            backgroundColor: 'var(--primary)',
+                                            borderRadius: '3px',
+                                            width: `${(subtasks.filter((st: any) => st.status === 'Finalizada').length / (subtasks.length || 1)) * 100}%`,
+                                            transition: 'width 0.3s ease'
+                                        }}
+                                    />
+                                </div>
+                            )}
+                            
+                            <div className="flex-col gap-2">
+                                {subtasks.map((st: any) => (
+                                    <div 
+                                        key={st.id} 
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'space-between',
+                                            padding: '0.75rem 1rem',
+                                            borderRadius: '12px',
+                                            backgroundColor: 'var(--bg-main)',
+                                            border: '1px solid var(--border-light)',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        className="group"
+                                    >
+                                        <div className="flex-row items-center gap-3" style={{ flex: 1 }}>
+                                            <div 
+                                                onClick={() => handleToggleSubtaskStatus(st)}
+                                                style={{
+                                                    width: '18px',
+                                                    height: '18px',
+                                                    borderRadius: '4px',
+                                                    border: '2px solid var(--primary)',
+                                                    background: (st.status === 'Finalizada') ? 'var(--primary)' : 'transparent',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {(st.status === 'Finalizada') && <CheckCircle2 size={12} color="white" />}
+                                            </div>
+                                            <span style={{ 
+                                                fontSize: '0.875rem', 
+                                                fontWeight: 600, 
+                                                textDecoration: (st.status === 'Finalizada') ? 'line-through' : 'none',
+                                                opacity: (st.status === 'Finalizada') ? 0.6 : 1
+                                            }}>
+                                                {st.title}
+                                            </span>
+                                        </div>
+                                        <button 
+                                            onClick={() => handleDeleteSubtask(st.id)}
+                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0 }}
+                                            className="group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                                
+                                <form onSubmit={handleAddSubtask} style={{ marginTop: '0.5rem' }}>
+                                    <input 
+                                        type="text"
+                                        placeholder="+ Añadir nueva subtarea rápida..."
+                                        value={newSubtaskTitle}
+                                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            background: 'transparent',
+                                            border: '1px dashed var(--border-light)',
+                                            padding: '12px',
+                                            borderRadius: '12px',
+                                            fontSize: '0.875rem',
+                                            outline: 'none',
+                                            color: 'var(--text-main)'
+                                        }}
+                                        disabled={isAddingSubtask}
+                                    />
+                                </form>
+                            </div>
+                        </div>
                     </Card>
 
                     <Card title="Chat de la Tarea">
@@ -325,21 +552,64 @@ export default function TaskDetailClient() {
                         </div>
                     </Card>
 
+                    <Card title="Equipo">
+                        <div className="flex-col gap-3">
+                            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ASIGNADOS</p>
+                            <div className="flex-row flex-wrap gap-2">
+                                {companyUsers.map((u: any) => {
+                                    const isAssigned = (task.assignedEmails || (task.assignedEmail ? [task.assignedEmail] : [])).includes(u.email);
+                                    return (
+                                        <div 
+                                            key={u.email}
+                                            onClick={() => handleToggleAssignment(u.email)}
+                                            style={{ 
+                                                padding: '6px 12px', 
+                                                borderRadius: '20px', 
+                                                fontSize: '0.75rem', 
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                background: isAssigned ? 'var(--primary-light)' : 'var(--bg-main)',
+                                                color: isAssigned ? 'var(--primary)' : 'var(--text-muted)',
+                                                border: `1px solid ${isAssigned ? 'var(--primary)' : 'var(--border-light)'}`
+                                            }}
+                                        >
+                                            <div style={{ 
+                                                width: '18px', 
+                                                height: '18px', 
+                                                borderRadius: '50%', 
+                                                backgroundColor: isAssigned ? 'var(--primary)' : 'var(--secondary)',
+                                                color: 'white',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '0.6rem'
+                                            }}>
+                                                {u.name?.charAt(0) || u.email.charAt(0).toUpperCase()}
+                                            </div>
+                                            {u.name || u.email.split('@')[0]}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </Card>
+
                     <Card title="Detalles">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div>
                                 <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>ÁREA</p>
-                                <div style={{ display: 'inline-block', padding: '0.25rem 0.75rem', borderRadius: '20px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                                <div style={{ display: 'inline-block', padding: '0.4rem 1rem', borderRadius: '20px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontSize: '0.8125rem', fontWeight: 700 }}>
                                     {task.area}
                                 </div>
                             </div>
                             <div>
                                 <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>CREADO POR</p>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'var(--secondary)', display: 'flex', alignItems: 'center', justifyItems: 'center', color: 'white', fontSize: '0.7rem', fontWeight: 'bold', justifyContent: 'center' }}>
-                                        {task.createdBy?.charAt(0).toUpperCase() || 'U'}
-                                    </div>
-                                    <span style={{ fontSize: '0.875rem' }}>{task.createdBy}</span>
+                                    <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>{task.createdBy}</span>
                                 </div>
                             </div>
                             <div>
@@ -348,8 +618,8 @@ export default function TaskDetailClient() {
                                     display: 'flex', 
                                     alignItems: 'center', 
                                     gap: '0.5rem', 
-                                    color: (task.dueDate && task.dueDate < new Date().toISOString().split('T')[0]) ? '#ef4444' : 'inherit',
-                                    fontWeight: (task.dueDate && task.dueDate < new Date().toISOString().split('T')[0]) ? 700 : 500
+                                    color: (task.dueDate && task.dueDate < new Date().toISOString().split('T')[0]) ? '#ef4444' : 'var(--text-main)',
+                                    fontWeight: (task.dueDate && task.dueDate < new Date().toISOString().split('T')[0]) ? 700 : 600
                                 }}>
                                     <Clock size={16} />
                                     <span style={{ fontSize: '0.875rem' }}>{task.dueDate || 'Sin fecha configurada'}</span>

@@ -35,6 +35,11 @@ export default function SettingsPage() {
     const [newAreaName, setNewAreaName] = React.useState("");
     const [savingAreas, setSavingAreas] = React.useState(false);
 
+    // Archiving Management State
+    const [archiveThresholdDays, setArchiveThresholdDays] = React.useState<number>(30);
+    const [deleteThresholdMonths, setDeleteThresholdMonths] = React.useState<number>(12);
+    const [savingAutomation, setSavingAutomation] = React.useState(false);
+
     const isAdmin = user?.role === "Admin" || user?.role === "CEO";
 
     React.useEffect(() => {
@@ -49,6 +54,12 @@ export default function SettingsPage() {
                     } else {
                         // Default areas if not set yet
                         setAreas(["General", "Ventas", "Logística", "Soporte", "Administración"]);
+                    }
+                    if (companyData.archiveThresholdDays !== undefined) {
+                        setArchiveThresholdDays(companyData.archiveThresholdDays);
+                    }
+                    if (companyData.deleteThresholdMonths !== undefined) {
+                        setDeleteThresholdMonths(companyData.deleteThresholdMonths);
                     }
                 }
             } catch (error) {
@@ -133,6 +144,23 @@ export default function SettingsPage() {
         }
     };
 
+    const handleSaveAutomation = async () => {
+        if (!user?.company_id) return;
+        setSavingAutomation(true);
+        try {
+            await updateDoc(doc(db, "companies", user.company_id), {
+                archiveThresholdDays: Number(archiveThresholdDays),
+                deleteThresholdMonths: Number(deleteThresholdMonths)
+            });
+            alert("Ajustes de automatización guardados correctamente.");
+        } catch (error) {
+            console.error("Error saving automation settings:", error);
+            alert("No se pudieron guardar los ajustes de automatización.");
+        } finally {
+            setSavingAutomation(false);
+        }
+    };
+
     if (authLoading) {
         return (
             <div className="flex-row justify-center" style={{ padding: '4rem' }}>
@@ -193,8 +221,8 @@ export default function SettingsPage() {
                                                         onChange={(e) => setEditingArea({ ...editingArea, value: e.target.value })}
                                                         autoFocus
                                                     />
-                                                    <button onClick={handleRenameArea} style={{ color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer' }}><Save size={18} /></button>
-                                                    <button onClick={() => setEditingArea(null)} style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}><CloseX size={18} /></button>
+                                                    <Button variant="ghost" size="sm" onClick={handleRenameArea} style={{ color: 'var(--primary)', padding: '4px' }}><Save size={18} /></Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => setEditingArea(null)} style={{ color: 'var(--text-muted)', padding: '4px' }}><CloseX size={18} /></Button>
                                                 </div>
                                             ) : (
                                                 <>
@@ -203,20 +231,24 @@ export default function SettingsPage() {
                                                         <span className="font-bold">{area}</span>
                                                     </div>
                                                     <div className="flex-row gap-1">
-                                                        <button 
+                                                        <Button 
+                                                            variant="ghost"
+                                                            size="sm"
                                                             onClick={() => setEditingArea({ index, value: area })}
-                                                            style={{ padding: '8px', borderRadius: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                                                            style={{ padding: '8px', color: 'var(--text-muted)' }}
                                                             className="hover-bg-light"
                                                         >
                                                             <Edit2 size={16} />
-                                                        </button>
-                                                        <button 
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost"
+                                                            size="sm"
                                                             onClick={() => handleRemoveArea(index)}
-                                                            style={{ padding: '8px', borderRadius: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}
+                                                            style={{ padding: '8px', color: '#ef4444' }}
                                                             className="hover-bg-light"
                                                         >
                                                             <Trash2 size={16} />
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </>
                                             )}
@@ -224,6 +256,63 @@ export default function SettingsPage() {
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </Card>
+            )}
+
+            {/* Task Automation Section (Admin Only) */}
+            {isAdmin && (
+                <Card 
+                    title="Automatización de Tareas" 
+                    subtitle="Configura cuándo las tareas deben archivarse o eliminarse definitivamente."
+                >
+                    <div className="flex-col gap-6" style={{ marginTop: '1.5rem' }}>
+                        <div className="grid-2">
+                            <div className="flex-col gap-2">
+                                <label className="text-small font-bold text-muted">Archivar tareas finalizadas tras (días)</label>
+                                <div className="flex-row gap-3">
+                                    <input 
+                                        type="number"
+                                        min="1"
+                                        className="premium-input flex-1"
+                                        value={archiveThresholdDays}
+                                        onChange={(e) => setArchiveThresholdDays(parseInt(e.target.value) || 1)}
+                                    />
+                                    <div className="text-muted text-small" style={{ width: '60px' }}>días</div>
+                                </div>
+                                <p className="text-xs" style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                    Las tareas en estado "Finalizado" se moverán al archivo automáticamente tras este periodo.
+                                </p>
+                            </div>
+
+                            <div className="flex-col gap-2">
+                                <label className="text-small font-bold text-muted">Eliminar permanentemente tras (meses)</label>
+                                <div className="flex-row gap-3">
+                                    <input 
+                                        type="number"
+                                        min="6"
+                                        max="36"
+                                        className="premium-input flex-1"
+                                        value={deleteThresholdMonths}
+                                        onChange={(e) => setDeleteThresholdMonths(parseInt(e.target.value) || 6)}
+                                    />
+                                    <div className="text-muted text-small" style={{ width: '60px' }}>meses</div>
+                                </div>
+                                <p className="text-xs" style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                                    Las tareas archivadas se eliminarán para siempre tras este periodo (máx. 36 meses).
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex-row justify-end">
+                            <Button 
+                                variant="primary" 
+                                onClick={handleSaveAutomation} 
+                                isLoading={savingAutomation}
+                            >
+                                <Save size={18} style={{ marginRight: '8px' }} /> Guardar Automatización
+                            </Button>
                         </div>
                     </div>
                 </Card>
@@ -284,15 +373,17 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="flex-row justify-between items-center" style={{ marginTop: '0.5rem' }}>
-                        <button 
+                        <Button 
+                            variant="ghost"
+                            size="sm"
                             type="button"
                             onClick={() => setShowPasswords(!showPasswords)}
                             className="flex-row items-center gap-2 text-small font-bold"
-                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}
+                            style={{ color: 'var(--primary)' }}
                         >
                             {showPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
                             {showPasswords ? "Ocultar Contraseñas" : "Mostrar Contraseñas"}
-                        </button>
+                        </Button>
 
                         <Button type="submit" variant="primary" isLoading={loading}>
                             Actualizar Contraseña

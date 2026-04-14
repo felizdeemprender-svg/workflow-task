@@ -1,9 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 
-export const onTaskAssignment = functions.firestore
-  .document('tasks/{taskId}')
-  .onWrite(async (change, context) => {
+export const onTaskAssignmentHandler = async (change: functions.Change<functions.firestore.DocumentSnapshot>, context: functions.EventContext) => {
     const before = change.before.data();
     const after = change.after.data();
 
@@ -28,22 +26,48 @@ export const onTaskAssignment = functions.firestore
         const usersSnapshot = await db.collection('users').where('email', '==', email).limit(1).get();
         if (!usersSnapshot.empty) {
           const userDoc = usersSnapshot.docs[0];
-          const fcmToken = userDoc.data().fcmToken;
+          const userData = userDoc.data();
+          
+          // Collect all unique tokens
+          const tokens = new Set<string>();
+          if (userData.fcmToken) tokens.add(userData.fcmToken);
+          if (Array.isArray(userData.fcmTokens)) {
+            userData.fcmTokens.forEach((t: string) => tokens.add(t));
+          }
 
-          if (fcmToken) {
-            await messaging.send({
-              token: fcmToken,
-              notification: {
-                title: 'Nueva Tarea Asignada',
-                body: `Se te ha asignado la tarea: "${after.title}"`
-              },
-              data: {
-                taskId: context.params.taskId
+          if (tokens.size > 0) {
+            const sendPromises = Array.from(tokens).map(async (token) => {
+              try {
+                await messaging.send({
+                  token: token,
+                  webpush: {
+                    headers: {
+                      Urgency: "high",
+                    },
+                    notification: {
+                      title: "Nueva Tarea Asignada",
+                      body: `Se te ha asignado la tarea: "${after.title}"`,
+                      tag: `task-${context.params.taskId}`,
+                      icon: "/logo.png"
+                    }
+                  },
+                  data: {
+                    title: 'Nueva Tarea Asignada',
+                    body: `Se te ha asignado la tarea: "${after.title}"`,
+                    taskId: context.params.taskId,
+                    url: `https://workflow-project-studio.web.app/dashboard`
+                  }
+                });
+                console.log(`Notification sent to device with token ${token.substring(0, 10)}...`);
+              } catch (err: any) {
+                console.error(`Error sending to token ${token.substring(0, 10)}...:`, err);
+                // Optional: Cleanup invalid token if needed
               }
             });
-            console.log(`Notification sent to ${email}`);
+            await Promise.all(sendPromises);
+            console.log(`Notifications broadcasted to ${email} (${tokens.size} devices)`);
           } else {
-            console.log(`User ${email} has no FCM token saved.`);
+            console.log(`User ${email} has no FCM tokens saved.`);
           }
         } else {
           console.log(`User document not found for email: ${email}`);
@@ -52,4 +76,4 @@ export const onTaskAssignment = functions.firestore
         console.error(`Failed to send notification to ${email}:`, error);
       }
     }
-  });
+  };

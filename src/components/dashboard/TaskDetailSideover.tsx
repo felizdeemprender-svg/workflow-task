@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
     X, Calendar, User, Tag, AlertCircle, Save, Trash2, 
@@ -19,39 +20,65 @@ interface TaskDetailSideoverProps {
     task: any;
     isOpen: boolean;
     onClose: () => void;
+    onTaskSelect?: (task: any) => void;
 }
 
 // Constants for queries
 const CHAT_CONSTRAINTS = [orderBy("createdAt", "asc")];
 const LOG_CONSTRAINTS = [orderBy("createdAt", "desc")];
 
-export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideoverProps) => {
-    const { user } = useAuth();
+export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: TaskDetailSideoverProps) => {
+    const { user, isAuthSynced } = useAuth();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const [editedTask, setEditedTask] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<"detalles" | "chat" | "actividad">("detalles");
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+    const [isAddingSubtask, setIsAddingSubtask] = useState(false);
 
     // Fetch company users
     const usersConstraints = useMemo(() =>
         user?.company_id ? [where('company_id', '==', user.company_id)] : [],
         [user?.company_id]
     );
-    const { data: companyUsers } = useFirestoreQuery<any>('users', usersConstraints, isOpen && !!user?.company_id);
+    const { data: companyUsers } = useFirestoreQuery<any>('users', usersConstraints, isOpen && isAuthSynced && !!user?.company_id);
+
+    // Query for subtasks
+    const subtasksConstraints = useMemo(() => 
+        (task?.id && user?.company_id) ? [
+            where('parentId', '==', task.id),
+            where('company_id', '==', user.company_id)
+        ] : [],
+        [task?.id, user?.company_id]
+    );
+    const { data: subtasks = [] } = useFirestoreQuery<any>(
+        'tasks',
+        subtasksConstraints,
+        isOpen && isAuthSynced && !!task?.id && !!user?.company_id,
+        [task?.id, user?.company_id]
+    );
 
     // Queries for chat and logs
     const { data: messages = [] } = useFirestoreQuery<any>(
         task?.id ? `tasks/${task.id}/chat` : "",
         CHAT_CONSTRAINTS,
-        isOpen && !!task?.id
+        isOpen && isAuthSynced && !!task?.id,
+        [task?.id]
     );
 
     const { data: logs = [] } = useFirestoreQuery<any>(
         task?.id ? `tasks/${task.id}/log` : "",
         LOG_CONSTRAINTS,
-        isOpen && !!task?.id
+        isOpen && isAuthSynced && !!task?.id,
+        [task?.id]
     );
 
     useEffect(() => {
@@ -177,7 +204,57 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
         }
     };
 
-    return (
+    const handleToggleSubtaskStatus = async (st: any) => {
+        if (!st.id || !user) return;
+        const newStatus = st.status === "Finalizada" ? "Pendiente" : "Finalizada";
+        try {
+            await taskActions.updateStatus(st.id, newStatus, user.uid);
+            toast.success(`Subtarea marcada como ${newStatus}`);
+        } catch (error) {
+            console.error("Error toggling subtask status:", error);
+            toast.error("Error al actualizar el estado");
+        }
+    };
+
+    const handleDeleteSubtask = async (stId: string) => {
+        if (!stId) return;
+        if (!confirm("¿Eliminar esta subtarea?")) return;
+        try {
+            await taskActions.deleteTask(stId);
+            toast.success("Subtarea eliminada");
+        } catch (error) {
+            console.error("Error deleting subtask:", error);
+            toast.error("Error al eliminar la subtarea");
+        }
+    };
+
+    const handleAddSubtask = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newSubtaskTitle.trim() || isAddingSubtask || !task?.id || !user) return;
+        
+        setIsAddingSubtask(true);
+        try {
+            await taskActions.createTask(user.company_id, {
+                title: newSubtaskTitle.trim(),
+                description: "",
+                status: "Pendiente",
+                priority: "Media",
+                area: task.area || "General",
+                parentId: task.id,
+                createdBy: user.email,
+                assignedEmails: []
+            });
+            setNewSubtaskTitle("");
+            toast.success("Subtarea añadida");
+        } catch (error) {
+            console.error("Error adding subtask:", error);
+            toast.error("Error al añadir la subtarea");
+        } finally {
+            setIsAddingSubtask(false);
+        }
+    };
+
+    const content = (
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -228,61 +305,37 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
                                 <CheckCircle2 size={24} className="text-primary" />
                                 <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.025em' }}>Tarea</h2>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={onClose} style={{ borderRadius: '50%', padding: '8px' }}>
+                            <Button variant="ghost" size="sm" onClick={onClose} style={{ borderRadius: '12px', padding: '0.6rem' }}>
                                 <X size={20} />
                             </Button>
                         </div>
 
                         {/* Tabs Navigation */}
                         <div className="flex-row gap-2" style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-                            <button 
+                            <Button 
+                                variant={activeTab === 'detalles' ? 'secondary' : 'ghost'} 
+                                size="sm"
                                 onClick={() => setActiveTab('detalles')}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
-                                    borderRadius: '8px',
-                                    background: activeTab === 'detalles' ? 'var(--primary-light)' : 'transparent',
-                                    color: activeTab === 'detalles' ? 'var(--primary)' : 'var(--text-muted)',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
+                                style={{ fontSize: '0.8rem', fontWeight: 700 }}
                             >
                                 Detalles
-                            </button>
-                            <button 
+                            </Button>
+                            <Button 
+                                variant={activeTab === 'chat' ? 'secondary' : 'ghost'} 
+                                size="sm"
                                 onClick={() => setActiveTab('chat')}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
-                                    borderRadius: '8px',
-                                    background: activeTab === 'chat' ? 'var(--primary-light)' : 'transparent',
-                                    color: activeTab === 'chat' ? 'var(--primary)' : 'var(--text-muted)',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
+                                style={{ fontSize: '0.8rem', fontWeight: 700 }}
                             >
                                 Chat ({messages.length})
-                            </button>
-                            <button 
+                            </Button>
+                            <Button 
+                                variant={activeTab === 'actividad' ? 'secondary' : 'ghost'} 
+                                size="sm"
                                 onClick={() => setActiveTab('actividad')}
-                                style={{
-                                    padding: '0.5rem 1rem',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
-                                    borderRadius: '8px',
-                                    background: activeTab === 'actividad' ? 'var(--primary-light)' : 'transparent',
-                                    color: activeTab === 'actividad' ? 'var(--primary)' : 'var(--text-muted)',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
+                                style={{ fontSize: '0.8rem', fontWeight: 700 }}
                             >
                                 Actividad
-                            </button>
+                            </Button>
                         </div>
 
                         <div style={{ 
@@ -362,6 +415,7 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
                                                     >
                                                         <option value="Pendiente">Pendiente</option>
                                                         <option value="En Proceso">En Proceso</option>
+                                                        <option value="Urgente">🔴 Urgente</option>
                                                         <option value="Finalizada">Finalizada</option>
                                                     </select>
                                                 </div>
@@ -480,6 +534,130 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Subtasks Section */}
+                                            <div className="flex-col gap-3" style={{ marginTop: '1rem', padding: '1.25rem', borderRadius: '20px', backgroundColor: 'rgba(var(--bg-main-rgb), 0.3)', border: '1px solid var(--border-light)' }}>
+                                                <div className="flex-row justify-between items-center">
+                                                    <div className="flex-row items-center gap-2">
+                                                        <CheckCircle2 size={18} className="text-primary" />
+                                                        <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>Subtareas</span>
+                                                     </div>
+                                                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                                         {subtasks.filter((st: any) => st.status === 'Finalizada').length} / {subtasks.length}
+                                                     </span>
+                                                 </div>
+
+                                                 {subtasks.length > 0 && (
+                                                     <div style={{ 
+                                                         width: '100%', 
+                                                         height: '4px', 
+                                                         backgroundColor: 'var(--border-light)', 
+                                                         borderRadius: '2px',
+                                                         overflow: 'hidden',
+                                                         marginBottom: '0.5rem'
+                                                     }}>
+                                                         <motion.div 
+                                                             initial={{ width: 0 }}
+                                                             animate={{ width: `${(subtasks.filter((st: any) => st.status === 'Finalizada').length / subtasks.length) * 100}%` }}
+                                                             style={{ 
+                                                                 height: '100%', 
+                                                                 backgroundColor: 'var(--primary)',
+                                                                 borderRadius: '2px'
+                                                             }}
+                                                         />
+                                                     </div>
+                                                 )}
+                                                 
+                                                 <div className="flex-col gap-2">
+                                                     {subtasks.length === 0 && (
+                                                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', margin: '0.5rem 0', opacity: 0.6 }}>No hay subtareas.</p>
+                                                     )}
+                                                     {subtasks
+                                                        .sort((a: any, b: any) => (a.status === 'Finalizada' ? 1 : 0) - (b.status === 'Finalizada' ? 1 : 0))
+                                                        .map((st: any) => (
+                                                         <div 
+                                                            key={st.id} 
+                                                            className="flex-row items-center justify-between p-2 rounded-xl bg-main border border-light hover-border-primary transition-all cursor-pointer group"
+                                                            onClick={() => onTaskSelect?.(st)}
+                                                         >
+                                                             <div className="flex-row items-center gap-3" style={{ flex: 1 }}>
+                                                                 <div 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleToggleSubtaskStatus(st);
+                                                                    }}
+                                                                    style={{
+                                                                        width: '14px',
+                                                                        height: '14px',
+                                                                        borderRadius: '4px',
+                                                                        border: '2px solid var(--primary)',
+                                                                        background: st.status === 'Finalizada' ? 'var(--primary)' : 'transparent',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        transition: 'all 0.2s',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                 >
+                                                                     {st.status === 'Finalizada' && <X size={10} color="white" />}
+                                                                 </div>
+                                                                 <span style={{ 
+                                                                    fontSize: '0.8rem', 
+                                                                    fontWeight: 600, 
+                                                                    color: 'var(--text-main)',
+                                                                    textDecoration: st.status === 'Finalizada' ? 'line-through' : 'none',
+                                                                    opacity: st.status === 'Finalizada' ? 0.6 : 1,
+                                                                    flex: 1
+                                                                 }}>
+                                                                     {st.title}
+                                                                 </span>
+                                                             </div>
+                                                             <div className="flex-row gap-2 items-center">
+                                                                 <Button 
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDeleteSubtask(st.id);
+                                                                    }}
+                                                                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 p-1 text-danger"
+                                                                 >
+                                                                     <Trash2 size={14} />
+                                                                 </Button>
+                                                                 <span style={{ 
+                                                                    fontSize: '0.6rem', 
+                                                                    padding: '2px 6px', 
+                                                                    borderRadius: '4px', 
+                                                                    background: 'var(--bg-card)',
+                                                                    color: 'var(--text-muted)',
+                                                                    border: '1px solid var(--border-light)',
+                                                                    opacity: 0.8
+                                                                 }}>{st.status}</span>
+                                                             </div>
+                                                         </div>
+                                                     ))}
+                                                     
+                                                     <form onSubmit={handleAddSubtask} style={{ marginTop: '0.5rem' }}>
+                                                         <input 
+                                                            type="text"
+                                                            placeholder="+ Añadir subtarea..."
+                                                            value={newSubtaskTitle}
+                                                            onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                                            style={{
+                                                                width: '100%',
+                                                                background: 'transparent',
+                                                                border: 'none',
+                                                                borderBottom: '1px dashed var(--border-light)',
+                                                                padding: '8px 4px',
+                                                                fontSize: '0.8rem',
+                                                                outline: 'none',
+                                                                color: 'var(--text-main)'
+                                                            }}
+                                                            disabled={isAddingSubtask}
+                                                         />
+                                                     </form>
+                                                 </div>
+                                             </div>
                                         </motion.div>
                                     )}
 
@@ -548,25 +726,17 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
                                                     placeholder="Escribir mensaje..."
                                                     style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: '0.85rem', color: 'var(--text-main)' }}
                                                 />
-                                                <button
+                                                 <Button
                                                     type="submit"
                                                     disabled={!message.trim() || isSending}
+                                                    variant="primary"
                                                     style={{
-                                                        backgroundColor: 'var(--primary)',
-                                                        color: 'white',
-                                                        border: 'none',
                                                         width: '32px',
                                                         height: '32px',
-                                                        borderRadius: '10px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'pointer',
-                                                        opacity: message.trim() && !isSending ? 1 : 0.6,
-                                                        transition: 'all 0.2s'
+                                                        borderRadius: '10px'
                                                     }}>
                                                     {isSending ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
-                                                </button>
+                                                </Button>
                                             </form>
                                         </motion.div>
                                     )}
@@ -681,4 +851,8 @@ export const TaskDetailSideover = ({ task, isOpen, onClose }: TaskDetailSideover
             `}</style>
         </AnimatePresence>
     );
+
+    if (!mounted) return null;
+    const root = document.getElementById("modal-root");
+    return root ? createPortal(content, root) : null;
 };

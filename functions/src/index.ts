@@ -1,8 +1,9 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import axios from "axios";
 
 admin.initializeApp();
+
+const getAxios = () => require("axios");
 
 const getDb = () => admin.firestore();
 const getAuth = () => admin.auth();
@@ -95,7 +96,7 @@ export const botResponse = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
             let shouldUpdateStatus = "";
 
             if (DEEPSEEK_API_KEY) {
-                const response = await axios.post("https://api.deepseek.com/v1/chat/completions", {
+                const response = await getAxios().post("https://api.deepseek.com/v1/chat/completions", {
                     model: "deepseek-chat",
                     messages: [
                         {
@@ -389,18 +390,19 @@ export const getDailyBriefing = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
             return { briefing: `¡Hola ${userData.name || userData.email?.split('@')[0] || 'compañero'}! Tienes ${tasks.length} tareas pendientes. ¡A por todas!` };
         }
 
-        const response = await axios.post("https://api.deepseek.com/v1/chat/completions", {
+        const response = await getAxios().post("https://api.deepseek.com/v1/chat/completions", {
             model: "deepseek-chat",
             messages: [
                 {
                     role: "system",
                     content: `Eres un asistente de productividad ultra-eficiente. 
-                    1. Resume las tareas del usuario.
-                    2. Ordénalas por prioridad (Alta > Media > Baja).
-                    3. Estima brevemente la dificultad de cada una (Baja, Media, Alta) basándote en el título.
-                    4. Sé extremadamente breve y directo. Usa viñetas. Sin introducciones innecesarias.`
+                    1. Analiza las tareas del usuario y selecciona ÚNICAMENTE las 3 o 4 más importantes, urgentes o complejas.
+                    2. Resume estas 3-4 tareas seleccionadas en un formato de viñetas muy directo.
+                    3. Prioriza tareas con prioridad 'Alta' o 'Urgente', o aquellas cuyos títulos sugieran alta dificultad técnica.
+                    4. Estima brevemente la dificultad de cada una (Baja/Media/Alta).
+                    5. Sé extremadamente breve. Sin introducciones ni despedidas.`
                 },
-                { role: "user", content: `Usuario: ${userData.name}. Tareas: ${JSON.stringify(tasks)}` }
+                { role: "user", content: `Usuario: ${userData.name}. Aquí están todas mis tareas pendientes: ${JSON.stringify(tasks)}. Por favor, selecciona las 4 más críticas y haz el resumen.` }
             ]
         }, {
             headers: { "Authorization": `Bearer ${DEEPSEEK_API_KEY}` }
@@ -437,7 +439,7 @@ export const processAICommand = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"
         const availableAreas = companyData?.areas || ["General", "Ventas", "Logística", "Soporte"];
         const areasStr = availableAreas.join("/");
 
-        const response = await axios.post("https://api.deepseek.com/v1/chat/completions", {
+        const response = await getAxios().post("https://api.deepseek.com/v1/chat/completions", {
             model: "deepseek-chat",
             messages: [
                 {
@@ -528,7 +530,7 @@ export const onTaskStatusFinalized = functions.runWith({ secrets: ["DEEPSEEK_API
 
             if (DEEPSEEK_API_KEY) {
                 try {
-                    const response = await axios.post("https://api.deepseek.com/v1/chat/completions", {
+                    const response = await getAxios().post("https://api.deepseek.com/v1/chat/completions", {
                         model: "deepseek-chat",
                         messages: [
                             {
@@ -611,7 +613,7 @@ export const generalChat = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
             { role: "user", content: query }
         ];
 
-        const response = await axios.post("https://api.deepseek.com/v1/chat/completions", {
+        const response = await getAxios().post("https://api.deepseek.com/v1/chat/completions", {
             model: "deepseek-chat",
             messages
         }, {
@@ -625,6 +627,247 @@ export const generalChat = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).
     }
 });
 
-// Global Exports
-export * from "./calendarSync";
-export * from "./notifications";
+/**
+ * Parses natural language transcript into structured task data JSON.
+ */
+export const parseTaskFromVoice = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Auth required");
+    
+    const { text, availableAreas } = data;
+    if (!text) throw new functions.https.HttpsError("invalid-argument", "Text required");
+
+    const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+    if (!DEEPSEEK_API_KEY) throw new functions.https.HttpsError("internal", "IA not configured");
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    try {
+        const response = await getAxios().post("https://api.deepseek.com/v1/chat/completions", {
+            model: "deepseek-chat",
+            messages: [
+                {
+                    role: "system",
+                    content: `Eres un asistente que extrae datos estructurados de tareas desde texto hablado. 
+                    Hoy es ${todayStr}. El formato de fecha debe ser YYYY-MM-DD.
+                    Debes devolver ÚNICAMENTE un objeto JSON válido con los siguientes campos:
+                    {
+                      "title": "string",
+                      "description": "string",
+                      "priority": "Baja" | "Media" | "Alta" | "Urgente",
+                      "area": "string (debe ser una de: ${availableAreas.join(', ')})",
+                      "dueDate": "string (formato YYYY-MM-DD)"
+                    }
+                    Si no estás seguro de un campo, usa valores por defecto (Media, General, etc.).`
+                },
+                { role: "user", content: text }
+            ],
+            response_format: { type: 'json_object' }
+        }, {
+            headers: { "Authorization": `Bearer ${DEEPSEEK_API_KEY}` }
+        });
+
+        const content = response.data.choices[0].message.content;
+        return JSON.parse(content);
+    } catch (error) {
+        console.error("AI Parsing Error:", error);
+        throw new functions.https.HttpsError("internal", "Error al procesar el audio con IA");
+    }
+});
+
+/**
+ * Intelligent Notebook Assistant: Semantic search and content generation based on user notes.
+ */
+export const notebookAI = functions.runWith({ secrets: ["DEEPSEEK_API_KEY"] }).https.onCall(async (data, context) => {
+    if (!context.auth) throw new functions.https.HttpsError("unauthenticated", "Auth required");
+    
+    const { mode, query, notes } = data; // mode: 'search' | 'generate'
+    if (!query) throw new functions.https.HttpsError("invalid-argument", "Query required");
+
+    const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+    if (!DEEPSEEK_API_KEY) throw new functions.https.HttpsError("internal", "IA not configured");
+
+    const notesContext = (notes || []).map((n: any) => `[Fecha: ${n.createdAt}] ${n.content}`).join("\n---\n");
+
+    try {
+        const response = await getAxios().post("https://api.deepseek.com/v1/chat/completions", {
+            model: "deepseek-chat",
+            messages: [
+                {
+                    role: "system",
+                    content: `Eres un asistente inteligente para un cuaderno personal. 
+                    Tienes acceso a las siguientes notas del usuario:
+                    ${notesContext}
+                    
+                    INSTRUCCIONES:
+                    - Si el modo es 'search': Tu objetivo es encontrar la información específica que el usuario busca en sus notas. Responde de forma concisa indicando qué encontraste y en qué fecha aproximada.
+                    - Si el modo es 'generate': Tu objetivo es crear contenido nuevo (resúmenes, correos, ideas) basado estrictamente en la información de las notas proporcionadas.
+                    - Sé amable, profesional y usa un tono de apoyo.`
+                },
+                { role: "user", content: query }
+            ]
+        }, {
+            headers: { "Authorization": `Bearer ${DEEPSEEK_API_KEY}` }
+        });
+
+        return { answer: response.data.choices[0].message.content };
+    } catch (error) {
+        console.error("Notebook AI Error:", error);
+        throw new functions.https.HttpsError("internal", "Error al conectar con el cerebro de la IA.");
+    }
+});
+
+// Dynamic Exports for Performance
+export const onTaskAssignment = functions.firestore.document('tasks/{taskId}').onWrite(async (change, context) => {
+    const mod = await import("./notifications");
+    return mod.onTaskAssignmentHandler(change, context);
+});
+
+// For calendar, we can use the same pattern or just export them directly if they aren't the bottleneck.
+// But let's keep them as standard exports for now or fix them if we have time.
+// Actually, let's fix them too.
+export const onTaskCreatedSync = functions.firestore.document('tasks/{taskId}').onCreate(async (snapshot, context) => {
+    const mod = await import("./calendarSync");
+    return (mod as any).onTaskCreatedSyncHandler(snapshot, context);
+});
+
+export const onTaskUpdatedSync = functions.firestore.document('tasks/{taskId}').onUpdate(async (change, context) => {
+    const mod = await import("./calendarSync");
+    return (mod as any).onTaskUpdatedSyncHandler(change, context);
+});
+
+export const onTaskDeletedSync = functions.firestore.document('tasks/{taskId}').onDelete(async (snapshot, context) => {
+    const mod = await import("./calendarSync");
+    return (mod as any).onTaskDeletedSyncHandler(snapshot, context);
+});
+
+/**
+ * Daily Task Cleanup: Archives finalized tasks and deletes old archived tasks.
+ * Runs every day at midnight.
+ */
+export const dailyTaskCleanup = functions.pubsub.schedule("0 0 * * *").onRun(async (context) => {
+    const db = getDb();
+    const now = admin.firestore.Timestamp.now();
+
+    try {
+        // 1. Get all companies to check their thresholds
+        const companiesSnapshot = await db.collection("companies").get();
+        
+        for (const companyDoc of companiesSnapshot.docs) {
+            const companyId = companyDoc.id;
+            const data = companyDoc.data();
+            const archiveDays = data.archiveThresholdDays || 30;
+            const deleteMonths = data.deleteThresholdMonths || 12;
+
+            const archiveDate = new Date();
+            archiveDate.setDate(archiveDate.getDate() - archiveDays);
+            const archiveTimestamp = admin.firestore.Timestamp.fromDate(archiveDate);
+
+            const deleteDate = new Date();
+            deleteDate.setMonth(deleteDate.getMonth() - deleteMonths);
+            const deleteTimestamp = admin.firestore.Timestamp.fromDate(deleteDate);
+
+            // A. Archive Phase
+            const toArchiveSnapshot = await db.collection("tasks")
+                .where("company_id", "==", companyId)
+                .where("status", "==", "Finalizada")
+                .where("isArchived", "!=", true)
+                .get();
+
+            // Filter manually for date as composite indices with inequalities on different fields are tricky
+            const archiveBatch = db.batch();
+            let archiveCount = 0;
+
+            toArchiveSnapshot.docs.forEach(doc => {
+                const task = doc.data();
+                if (task.lastCompletedAt && task.lastCompletedAt.toMillis() <= archiveTimestamp.toMillis()) {
+                    archiveBatch.update(doc.ref, { 
+                        isArchived: true, 
+                        archivedAt: now,
+                        updatedAt: now 
+                    });
+                    archiveCount++;
+                }
+            });
+
+            if (archiveCount > 0) {
+                console.log(`Archiving ${archiveCount} tasks for company ${companyId}`);
+                await archiveBatch.commit();
+            }
+
+            // B. Delete Phase
+            const toDeleteSnapshot = await db.collection("tasks")
+                .where("company_id", "==", companyId)
+                .where("isArchived", "==", true)
+                .where("archivedAt", "<=", deleteTimestamp)
+                .get();
+
+            if (!toDeleteSnapshot.empty) {
+                console.log(`Deleting ${toDeleteSnapshot.size} archived tasks for company ${companyId}`);
+                const deleteBatch = db.batch();
+                toDeleteSnapshot.docs.forEach(doc => {
+                    deleteBatch.delete(doc.ref);
+                });
+                await deleteBatch.commit();
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error("Cleanup Error:", error);
+        return null;
+    }
+});
+
+
+/**
+ * Mark Overdue Tasks: Automatically changes status to 'Urgente' for tasks
+ * whose dueDate has passed and are not yet Finalizada.
+ * Runs every day at 00:05 (just after midnight).
+ */
+export const markOverdueTasks = functions.pubsub.schedule("5 0 * * *").onRun(async () => {
+    const db = getDb();
+
+    // Today at midnight (start of day) in ISO format: "YYYY-MM-DD"
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    try {
+        // Get all tasks that are overdue and not already Finalizada or Urgente
+        const snapshot = await db.collection("tasks")
+            .where("dueDate", "<", todayStr)
+            .get();
+
+        if (snapshot.empty) {
+            console.log("markOverdueTasks: No overdue tasks found.");
+            return null;
+        }
+
+        const batch = db.batch();
+        let updatedCount = 0;
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            // Skip if already Finalizada or Urgente
+            if (data.status === "Finalizada" || data.status === "Urgente") return;
+
+            batch.update(doc.ref, {
+                status: "Urgente",
+                overdueAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            updatedCount++;
+        });
+
+        if (updatedCount > 0) {
+            await batch.commit();
+            console.log(`markOverdueTasks: Marked ${updatedCount} tasks as Urgente.`);
+        } else {
+            console.log("markOverdueTasks: All overdue tasks already Finalizada or Urgente.");
+        }
+
+        return null;
+    } catch (error) {
+        console.error("markOverdueTasks Error:", error);
+        return null;
+    }
+});

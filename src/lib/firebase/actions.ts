@@ -32,6 +32,8 @@ export const taskActions = {
             assignedEmails,
             assignedEmail: assignedEmails[0] || null, // Keeping legacy field for compatibility
             recurrence: taskData.recurrence || { frequency: 'None' },
+            parentId: taskData.parentId || null,
+            isArchived: false,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
@@ -105,7 +107,7 @@ export const taskActions = {
         let nextDueDate = taskData.dueDate;
 
         // Recurring task logic
-        if (newStatus === 'Finalizado' && taskData.recurrence?.frequency && taskData.recurrence.frequency !== 'None') {
+        if (newStatus === 'Finalizada' && taskData.recurrence?.frequency && taskData.recurrence.frequency !== 'None') {
             const current = new Date(taskData.dueDate + 'T00:00:00');
             const end = new Date(taskData.recurrence.endDate + 'T23:59:59');
             
@@ -127,7 +129,7 @@ export const taskActions = {
         await updateDoc(taskRef, {
             status: finalStatus,
             dueDate: nextDueDate,
-            lastCompletedAt: newStatus === 'Finalizado' ? serverTimestamp() : taskData.lastCompletedAt || null,
+            lastCompletedAt: newStatus === 'Finalizada' ? serverTimestamp() : taskData.lastCompletedAt || null,
             updatedAt: serverTimestamp(),
         });
 
@@ -171,6 +173,23 @@ export const taskActions = {
         const taskRef = doc(db, 'tasks', taskId);
         const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(taskRef);
+    },
+
+    archiveTask: async (taskId: string) => {
+        const taskRef = doc(db, 'tasks', taskId);
+        await updateDoc(taskRef, {
+            isArchived: true,
+            archivedAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+    },
+
+    restoreTask: async (taskId: string) => {
+        const taskRef = doc(db, 'tasks', taskId);
+        await updateDoc(taskRef, {
+            isArchived: false,
+            updatedAt: serverTimestamp(),
+        });
     }
 };
 
@@ -214,5 +233,70 @@ export const notificationActions = {
             read: false,
             createdAt: serverTimestamp(),
         });
+    }
+};
+
+export const chatActions = {
+    getChatId: (u1: string, u2: string) => [u1, u2].sort().join('_'),
+    sendMessage: async (chatId: string, companyId: string, messageData: any) => {
+        const { collection, addDoc, doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase/config');
+        
+        // 1. Create/Update parent chat doc FIRST to establish permissions
+        await setDoc(doc(db, 'chats', chatId), {
+            lastMessage: messageData.text,
+            lastMessageAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            participants: chatId.split('_'),
+            company_id: companyId
+        }, { merge: true });
+
+        // 2. Then add the message
+        await addDoc(collection(db, `chats/${chatId}/messages`), {
+            ...messageData,
+            company_id: companyId,
+            createdAt: serverTimestamp()
+        });
+    }
+};
+
+export const notebookActions = {
+    createNote: async (companyId: string, userId: string, content: string, type: 'text' | 'audio' = 'text') => {
+        const noteRef = await addDoc(collection(db, 'notebook_entries'), {
+            company_id: companyId,
+            user_id: userId,
+            content,
+            type,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+        return noteRef.id;
+    },
+
+    updateNote: async (noteId: string, content: string) => {
+        const { updateDoc } = await import('firebase/firestore');
+        await updateDoc(doc(db, 'notebook_entries', noteId), {
+            content,
+            updatedAt: serverTimestamp(),
+        });
+    },
+
+    deleteNote: async (noteId: string) => {
+        const { deleteDoc } = await import('firebase/firestore');
+        await deleteDoc(doc(db, 'notebook_entries', noteId));
+    },
+
+    saveDraft: async (userId: string, content: string) => {
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'notebook_drafts', userId), {
+            content,
+            updatedAt: serverTimestamp(),
+        }, { merge: true });
+    },
+
+    getDraft: async (userId: string) => {
+        const { getDoc } = await import('firebase/firestore');
+        const draftDoc = await getDoc(doc(db, 'notebook_drafts', userId));
+        return draftDoc.exists() ? draftDoc.data() : null;
     }
 };

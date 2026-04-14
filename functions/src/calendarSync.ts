@@ -61,11 +61,9 @@ async function getAuthClient(companyId: string) {
 }
 
 /**
- * Trigger: onCreate Task
+ * Trigger: onCreate Task Logic
  */
-export const onTaskCreatedSync = functions.firestore
-    .document("tasks/{taskId}")
-    .onCreate(async (snapshot, context) => {
+export const onTaskCreatedSyncHandler = async (snapshot: admin.firestore.QueryDocumentSnapshot, context: functions.EventContext) => {
         const taskData = snapshot.data();
         if (!taskData) return;
 
@@ -102,14 +100,12 @@ export const onTaskCreatedSync = functions.firestore
         } catch (error) {
             console.error("Google Calendar Insert Error:", error);
         }
-    });
+    };
 
 /**
- * Trigger: onUpdate Task
+ * Trigger: onUpdate Task Logic
  */
-export const onTaskUpdatedSync = functions.firestore
-    .document("tasks/{taskId}")
-    .onUpdate(async (change, context) => {
+export const onTaskUpdatedSyncHandler = async (change: functions.Change<functions.firestore.DocumentSnapshot>, context: functions.EventContext) => {
         const after = change.after.data();
         const before = change.before.data();
         if (!after) return;
@@ -163,14 +159,12 @@ export const onTaskUpdatedSync = functions.firestore
         } catch (error) {
             console.error("Google Calendar Update Error:", error);
         }
-    });
+    };
 
 /**
- * Trigger: onDelete Task
+ * Trigger: onDelete Task Logic
  */
-export const onTaskDeletedSync = functions.firestore
-    .document("tasks/{taskId}")
-    .onDelete(async (snapshot, context) => {
+export const onTaskDeletedSyncHandler = async (snapshot: admin.firestore.QueryDocumentSnapshot, context: functions.EventContext) => {
         const taskData = snapshot.data();
         const eventId = taskData?.googleEventId;
         if (!eventId) return;
@@ -191,4 +185,4 @@ export const onTaskDeletedSync = functions.firestore
         } catch (error) {
             console.error("Google Calendar Delete Error:", error);
         }
-    });
+    };

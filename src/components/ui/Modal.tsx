@@ -3,15 +3,17 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
-    title: string;
+    title: React.ReactNode;
     children: React.ReactNode;
+    size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export const Modal = ({ isOpen, onClose, title, children }: ModalProps): JSX.Element | null => {
+export const Modal = ({ isOpen, onClose, title, children, size = 'md', noPadding = false }: ModalProps): JSX.Element | null => {
     const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
@@ -25,6 +27,13 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps): JSX.Ele
     }, [isOpen]);
 
     if (!isOpen || !mounted) return null;
+
+    const sizeMap = {
+        sm: '450px',
+        md: '650px',
+        lg: '850px',
+        xl: '1100px'
+    };
 
     const modalContent = (
         <div 
@@ -49,9 +58,8 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps): JSX.Ele
                 style={{
                     backgroundColor: 'white',
                     borderRadius: '24px',
-                    width: 'min(95%, 550px)',
+                    width: `min(95%, ${sizeMap[size]})`,
                     maxHeight: '85vh',
-                    padding: 'var(--main-p)',
                     boxShadow: '0 40px 80px -15px rgba(0, 0, 0, 0.5)',
                     position: 'relative',
                     animation: 'modalIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -60,28 +68,43 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps): JSX.Ele
                     overflow: 'hidden',
                 }}
             >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#111827' }}>{title}</h2>
-                    <button 
+                <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    padding: 'var(--main-p)',
+                    paddingBottom: '1rem' 
+                }}>
+                    {typeof title === 'string' ? (
+                        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#111827' }}>{title}</h2>
+                    ) : (
+                        <div>{title}</div>
+                    )}
+                    <Button 
+                        variant="ghost"
+                        size="sm"
                         onClick={onClose}
                         style={{ 
                             background: '#f3f4f6', 
-                            border: 'none',
                             borderRadius: '14px',
-                            cursor: 'pointer', 
-                            color: '#4b5563',
                             width: '44px',
                             height: '44px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s'
+                            marginRight: '2.5rem'
                         }}
                     >
                         <X size={26} />
-                    </button>
+                    </Button>
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+                <div style={{ 
+                    flex: 1, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    overflow: 'hidden', 
+                    minHeight: 0,
+                    padding: noPadding ? 0 : 'var(--main-p)',
+                    paddingTop: 0,
+                    paddingBottom: noPadding ? 0 : 'var(--main-p)'
+                }}>
                     {children}
                 </div>
             </div>

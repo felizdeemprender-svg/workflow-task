@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFirestoreQuery } from "@/hooks/useFirestoreQuery";
 import { where, orderBy, limit, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import { Button } from "@/components/ui/Button";
 
 export const NotificationBell = () => {
     const { user } = useAuth();
@@ -40,20 +41,16 @@ export const NotificationBell = () => {
 
     return (
         <div style={{ position: 'relative' }}>
-            <button
+            <Button
+                variant="ghost"
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
                     position: 'relative',
                     background: isOpen ? 'var(--primary)' : 'white',
                     border: '1px solid var(--border-light)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     width: '48px',
                     height: '48px',
                     borderRadius: '24px',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     boxShadow: isOpen ? '0 8px 20px rgba(79, 70, 229, 0.3)' : '0 4px 12px rgba(0,0,0,0.08)',
                     animation: unreadCount > 0 && !isOpen ? 'pulse-glow 2s infinite' : 'none'
                 }}
@@ -83,7 +80,7 @@ export const NotificationBell = () => {
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
-            </button>
+            </Button>
 
             {isOpen && (
                 <>
@@ -152,13 +149,15 @@ export const NotificationBell = () => {
                                                     {n.createdAt?.toDate ? n.createdAt.toDate().toLocaleDateString() + ' ' + n.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Ahora'}
                                                 </span>
                                                 {!n.read && (
-                                                    <button 
-                                                        onClick={() => updateDoc(doc(db, 'notifications', n.id), { read: true })}
-                                                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.6875rem', fontWeight: 700, cursor: 'pointer', padding: '4px 8px', borderRadius: '4px' }}
-                                                        className="hover-bg-light"
-                                                    >
-                                                        Listo
-                                                    </button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm"
+                                                    onClick={() => updateDoc(doc(db, 'notifications', n.id), { read: true })}
+                                                    className="text-primary font-bold"
+                                                    style={{ fontSize: '0.6875rem', padding: '4px 8px' }}
+                                                >
+                                                    Listo
+                                                </Button>
                                                 )}
                                             </div>
                                         </div>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Bot, X, Send, Loader2, Sparkles } from 'lucide-react';
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase/config";
+import { Button } from "@/components/ui/Button";
 
 export const FloatingBot = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -72,12 +73,20 @@ export const FloatingBot = () => {
                                 <p style={{ fontSize: '0.7rem', opacity: 0.9 }}>Asistente Inteligente</p>
                             </div>
                         </div>
-                        <button 
+                        <Button 
+                            variant="ghost" 
+                            size="sm"
                             onClick={() => setIsOpen(false)}
-                            style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex' }}
+                            style={{ 
+                                color: 'white', 
+                                padding: '0',
+                                width: '32px',
+                                height: '32px',
+                                background: 'rgba(255,255,255,0.1)'
+                            }}
                         >
                             <X size={20} />
-                        </button>
+                        </Button>
                     </div>
 
                     {/* Chat Area */}
@@ -127,20 +136,19 @@ export const FloatingBot = () => {
                             placeholder="Pregunta algo..."
                             style={{ flex: 1, border: 'none', background: 'var(--bg-main)', padding: '0.6rem 1rem', borderRadius: '8px', fontSize: '0.85rem', outline: 'none' }}
                         />
-                        <button 
+                        <Button 
+                            variant="primary"
                             type="submit"
                             style={{ 
-                                background: 'var(--primary)', color: 'white', border: 'none', 
-                                width: '36px', height: '36px', borderRadius: '8px', display: 'flex', 
-                                alignItems: 'center', justifyContent: 'center', cursor: 'pointer' 
+                                width: '36px', height: '36px', borderRadius: '8px'
                             }}
                         >
                             <Send size={18} />
-                        </button>
+                        </Button>
                     </form>
                 </div>
             ) : (
-                <button 
+                <Button 
                     onClick={() => setIsOpen(true)}
                     style={{
                         width: '60px',
@@ -148,20 +156,14 @@ export const FloatingBot = () => {
                         borderRadius: '30px',
                         background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
                         color: 'white',
-                        border: 'none',
                         boxShadow: '0 8px 24px rgba(79, 70, 229, 0.4)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        transition: 'transform 0.2s',
-                        animation: 'bounce 2s infinite'
+                        animation: 'bounce 2s infinite',
+                        border: 'none'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    className="hover-scale"
                 >
                     <Bot size={28} />
-                </button>
+                </Button>
             )}
 
             <style jsx>{`
