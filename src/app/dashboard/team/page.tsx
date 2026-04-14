@@ -230,7 +230,9 @@ export default function TeamPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
                     {filteredMembers.map((member) => (
                         <Card key={member.id} className="hover-lift group" style={{ padding: '1.5rem', borderRadius: '24px', position: 'relative', overflow: 'hidden' }}>
                             <div style={{ display: 'flex', flexDirection: 'row', gap: '1.25rem', alignItems: 'center' }}>
@@ -331,7 +333,6 @@ export default function TeamPage() {
                         </Card>
                     ))}
                 </div>
-   </div>
             </div>
 
             {/* Add Member Modal */}

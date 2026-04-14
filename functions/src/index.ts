@@ -744,6 +744,11 @@ export const onTaskDeletedSync = functions.firestore.document('tasks/{taskId}').
     return (mod as any).onTaskDeletedSyncHandler(snapshot, context);
 });
 
+export const onChatMessageCreated = functions.firestore.document('chats/{chatId}/messages/{messageId}').onCreate(async (snapshot, context) => {
+    const mod = await import("./chatNotifications");
+    return mod.onChatMessageCreatedHandler(snapshot, context);
+});
+
 /**
  * Daily Task Cleanup: Archives finalized tasks and deletes old archived tasks.
  * Runs every day at midnight.
