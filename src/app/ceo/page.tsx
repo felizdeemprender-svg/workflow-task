@@ -46,7 +46,8 @@ export default function SuperAdminCEOPage() {
         phone: '', 
         contactName: '', 
         notes: '', 
-        main_area: 'General' 
+        main_area: 'General',
+        isAgency: false
     });
     const [newAdmin, setNewAdmin] = React.useState({ 
         email: '', 
@@ -79,7 +80,7 @@ export default function SuperAdminCEOPage() {
             }
             setIsCompanyModalOpen(false);
             setEditingCompanyId(null);
-            setNewCompany({ name: '', phone: '', contactName: '', notes: '', main_area: 'General' });
+            setNewCompany({ name: '', phone: '', contactName: '', notes: '', main_area: 'General', isAgency: false });
         } catch (error: any) {
             alert("Error: " + error.message);
         } finally {
@@ -124,7 +125,8 @@ export default function SuperAdminCEOPage() {
             phone: company.phone || '',
             contactName: company.contactName || '',
             notes: company.notes || '',
-            main_area: company.main_area || 'General'
+            main_area: company.main_area || 'General',
+            isAgency: company.isAgency || false
         });
         setIsCompanyModalOpen(true);
     };
@@ -182,7 +184,7 @@ export default function SuperAdminCEOPage() {
                     </Button>
                     <Button variant="primary" onClick={() => {
                         setEditingCompanyId(null);
-                        setNewCompany({ name: '', phone: '', contactName: '', notes: '', main_area: 'General' });
+                        setNewCompany({ name: '', phone: '', contactName: '', notes: '', main_area: 'General', isAgency: false });
                         setIsCompanyModalOpen(true);
                     }}>
                         <Plus size={18} style={{ marginRight: '8px' }} /> Registrar Empresa
@@ -247,8 +249,15 @@ export default function SuperAdminCEOPage() {
                                         </div>
                                         <p className="text-small text-muted">ID: {c.id}</p>
                                     </div>
-                                    <div style={{ backgroundColor: 'var(--bg-main)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)' }}>
-                                        {c.main_area || 'General'}
+                                    <div className="flex-row gap-2">
+                                        {c.isAgency && (
+                                            <div style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: '#ec4899' }}>
+                                                Agencia
+                                            </div>
+                                        )}
+                                        <div style={{ backgroundColor: 'var(--bg-main)', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                            {c.main_area || 'General'}
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -312,6 +321,21 @@ export default function SuperAdminCEOPage() {
                         <label className="text-small font-bold text-muted">Área Principal</label>
                         <input type="text" className="premium-input" value={newCompany.main_area} onChange={e => setNewCompany({ ...newCompany, main_area: e.target.value })} />
                     </div>
+                    
+                    <div className="flex-row gap-3 items-center" style={{ padding: '0.75rem', backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-light)', marginTop: '0.5rem' }}>
+                        <input 
+                            type="checkbox" 
+                            id="isAgency"
+                            checked={newCompany.isAgency}
+                            onChange={e => setNewCompany({ ...newCompany, isAgency: e.target.checked })}
+                            style={{ width: '1.25rem', height: '1.25rem', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                        />
+                        <div className="flex-col">
+                            <label htmlFor="isAgency" style={{ fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}>Especialización Agencia de Marketing</label>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Habilita módulos exclusivos para gestión de clientes y redes sociales.</span>
+                        </div>
+                    </div>
+
                     <div className="flex-col gap-1">
                         <label className="text-small font-bold text-muted">Notas Internas</label>
                         <textarea className="premium-input" style={{ minHeight: '80px', resize: 'vertical' }} value={newCompany.notes} onChange={e => setNewCompany({ ...newCompany, notes: e.target.value })} placeholder="Detalles de facturación, acuerdos, etc." />

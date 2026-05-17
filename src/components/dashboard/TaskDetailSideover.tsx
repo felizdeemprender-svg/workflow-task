@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
     X, Calendar, User, Tag, AlertCircle, Save, Trash2, 
     Clock, CheckCircle2, Circle, Loader2, Send, Paperclip, 
-    Bot, History, MessageSquare 
+    Bot, History, MessageSquare, Repeat
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { taskActions, notificationActions } from "@/lib/firebase/actions";
@@ -104,6 +104,16 @@ export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: Task
 
     const handleSave = async () => {
         if (!task?.id || !editedTask || !user) return;
+
+        // Validation: Cannot finish if subtasks are pending
+        if (editedTask.status === "Finalizada") {
+            const pendingSubtasks = subtasks.filter((st: any) => st.status !== "Finalizada");
+            if (pendingSubtasks.length > 0) {
+                toast.error(`No se puede finalizar: Existen ${pendingSubtasks.length} subtareas pendientes.`);
+                return;
+            }
+        }
+
         setIsSaving(true);
         
         // Build change log
@@ -112,6 +122,9 @@ export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: Task
         if (editedTask.status !== task.status) changes.push(`Estado: ${task.status} -> ${editedTask.status}`);
         if (editedTask.priority !== task.priority) changes.push(`Prioridad: ${task.priority} -> ${editedTask.priority}`);
         if (editedTask.dueDate !== task.dueDate) changes.push(`Vto: ${task.dueDate} -> ${editedTask.dueDate}`);
+        if (editedTask.recurrence?.frequency !== task.recurrence?.frequency) {
+            changes.push(`Recurrencia: ${task.recurrence?.frequency || 'Ninguna'} -> ${editedTask.recurrence?.frequency || 'Ninguna'}`);
+        }
         
         const oldEmails = task.assignedEmails || (task.assignedEmail ? [task.assignedEmail] : []);
         const newEmails = editedTask.assignedEmails || [];
@@ -396,7 +409,6 @@ export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: Task
                                                     }}
                                                 />
                                             </div>
-
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                                                 <div className="flex-col gap-2">
                                                     <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estado</label>
@@ -441,7 +453,8 @@ export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: Task
                                                 </div>
                                             </div>
 
-                                                <div className="flex-col gap-4" style={{ backgroundColor: 'rgba(var(--bg-main-rgb), 0.3)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border-light)' }}>
+                                            <div className="flex-col gap-4" style={{ backgroundColor: 'rgba(var(--bg-main-rgb), 0.3)', padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border-light)' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                                     <div className="flex-row items-center gap-3">
                                                         <Clock size={16} className="text-primary" />
                                                         <div className="flex-col">
@@ -454,7 +467,28 @@ export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: Task
                                                             />
                                                         </div>
                                                     </div>
+                                                    <div className="flex-row items-center gap-3">
+                                                        <Repeat size={16} className="text-primary" />
+                                                        <div className="flex-col">
+                                                            <span style={{ fontSize: '0.65rem', opacity: 0.6, color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Recurrencia</span>
+                                                            <select
+                                                                value={editedTask.recurrence?.frequency || "None"}
+                                                                onChange={(e) => {
+                                                                    const freq = e.target.value;
+                                                                    const endDate = freq !== 'None' ? (editedTask.recurrence?.endDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]) : "";
+                                                                    setEditedTask({ ...editedTask, recurrence: { frequency: freq, endDate } });
+                                                                }}
+                                                                style={{ border: 'none', background: 'transparent', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)', outline: 'none', cursor: 'pointer' }}
+                                                            >
+                                                                <option value="None">Ninguna</option>
+                                                                <option value="Diaria">Diaria</option>
+                                                                <option value="Semanal">Semanal</option>
+                                                                <option value="Mensual">Mensual</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
                                                 </div>
+                                            </div>
 
                                                 <div className="flex-col gap-3" style={{ padding: '1.25rem', borderRadius: '20px', backgroundColor: 'rgba(var(--bg-main-rgb), 0.3)', border: '1px solid var(--border-light)' }}>
                                                     <div className="flex-row items-center gap-2">
@@ -494,7 +528,7 @@ export const TaskDetailSideover = ({ task, isOpen, onClose, onTaskSelect }: Task
                                                                     border: '1.5px solid currentColor',
                                                                     background: (editedTask.assignedEmails || []).includes(u.email) ? 'currentColor' : 'transparent'
                                                                 }} />
-                                                                {u.name || u.email.split('@')[0]}
+                                                                {u.name || u.email?.split('@')[0] || 'Usuario'}
                                                             </div>
                                                         ))}
                                                     </div>

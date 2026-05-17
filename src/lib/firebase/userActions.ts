@@ -21,6 +21,7 @@ export const userActions = {
         max_storage?: string;
         ai_quota?: number;
         main_area?: string;
+        isAgency?: boolean;
     }) => {
         const companyRef = await addDoc(collection(db, 'companies'), {
             ...companyData,
@@ -38,6 +39,7 @@ export const userActions = {
         notes: string;
         main_area: string;
         ai_quota: number;
+        isAgency: boolean;
     }>) => {
         const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
         const { db } = await import('@/lib/firebase/config');

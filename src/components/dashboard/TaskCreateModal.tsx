@@ -7,7 +7,7 @@ import {
     Paperclip, ChevronDown, X, Flag, Calendar,
     Tag, MessageSquare, Layout, AlignLeft,
     Maximize2, Minus, Maximize, PlaySquare, MoreHorizontal,
-    Sparkles, CheckSquare, Mic, MicOff, Loader2
+    Sparkles, CheckSquare, Mic, MicOff, Loader2, Repeat
 } from "lucide-react";
 import { taskActions } from "@/lib/firebase/actions";
 import { functions } from "@/lib/firebase/config";
@@ -284,6 +284,25 @@ export const TaskCreateModal = ({
                                 {companyUsers?.map((u: any) => <option key={u.email} value={u.email}>{u.name || u.email}</option>)}
                             </select>
                         </div>
+
+                        {/* Recurrence */}
+                        <div className="cu-pill cu-dropdown">
+                            <Repeat size={12} />
+                            <span>{newTask.recurrence.frequency === 'None' ? 'Recurrencia' : newTask.recurrence.frequency}</span>
+                            <select 
+                                value={newTask.recurrence.frequency} 
+                                onChange={e => {
+                                    const freq = e.target.value;
+                                    const endDate = freq !== 'None' ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : "";
+                                    setNewTask({ ...newTask, recurrence: { frequency: freq, endDate } });
+                                }}
+                            >
+                                <option value="None">Sin recurrencia</option>
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Mensual">Mensual</option>
+                            </select>
+                        </div>
                         
                         {/* Due Date */}
                         <div className="cu-pill cu-pill-date" onClick={() => {
@@ -317,6 +336,25 @@ export const TaskCreateModal = ({
                             </select>
                         </div>
                     </div>
+
+                    {/* Assigned Users List (Removable) */}
+                    {newTask.assignedEmails.length > 0 && (
+                        <div className="flex-row flex-wrap gap-2 mb-4">
+                            {newTask.assignedEmails.map(email => {
+                                const userObj = companyUsers?.find(u => u.email === email);
+                                return (
+                                    <div key={email} className="cu-mini-pill" style={{ padding: '4px 8px', gap: '8px', borderStyle: 'solid' }}>
+                                        <span style={{ fontSize: '0.7rem' }}>{userObj?.name || email?.split('@')[0] || 'Usuario'}</span>
+                                        <X 
+                                            size={12} 
+                                            className="cursor-pointer hover:text-danger" 
+                                            onClick={() => setNewTask(p => ({ ...p, assignedEmails: p.assignedEmails.filter(e => e !== email) }))} 
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     <div className="cu-divider" />
 

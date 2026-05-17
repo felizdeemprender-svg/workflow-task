@@ -20,7 +20,8 @@ import {
     Sun,
     Moon,
     Archive,
-    BookOpen
+    BookOpen,
+    Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/context/AuthContext";
@@ -34,6 +35,7 @@ export const Sidebar = () => {
     const navItems = [
         { name: "Inicio", icon: LayoutDashboard, href: "/dashboard" },
         { name: "Tareas", icon: CheckSquare, href: "/dashboard/tasks" },
+        { name: "Clientes", icon: Briefcase, href: "/dashboard/clients" },
         { name: "Equipo", icon: Users, href: "/dashboard/team" },
         { name: "Encuestas", icon: PieChart, href: "/dashboard/polls" },
         { name: "Calendario", icon: Calendar, href: "/dashboard/calendar" },

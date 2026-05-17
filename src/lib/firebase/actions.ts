@@ -156,8 +156,28 @@ export const taskActions = {
     updateTask: async (taskId: string, taskData: any, log?: { action: string, user: string, details: string }) => {
         const taskRef = doc(db, 'tasks', taskId);
         
+        let finalStatus = taskData.status;
+        let nextDueDate = taskData.dueDate;
+
+        // Recurring task logic if status is being changed to Finalizada
+        if (taskData.status === 'Finalizada' && taskData.recurrence?.frequency && taskData.recurrence.frequency !== 'None') {
+            const current = new Date(taskData.dueDate + 'T00:00:00');
+            const end = new Date(taskData.recurrence.endDate + 'T23:59:59');
+            
+            if (taskData.recurrence.frequency === 'Diaria') current.setDate(current.getDate() + 1);
+            else if (taskData.recurrence.frequency === 'Semanal') current.setDate(current.getDate() + 7);
+            else if (taskData.recurrence.frequency === 'Mensual') current.setMonth(current.getMonth() + 1);
+
+            if (current <= end) {
+                finalStatus = 'Pendiente'; 
+                nextDueDate = current.toISOString().split('T')[0];
+            }
+        }
+
         await updateDoc(taskRef, {
             ...taskData,
+            status: finalStatus,
+            dueDate: nextDueDate,
             updatedAt: serverTimestamp(),
         });
 
