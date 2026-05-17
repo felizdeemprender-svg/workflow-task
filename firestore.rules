@@ -63,6 +63,15 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (isCEO() || getCompanyId() == companyId);
       allow update: if isAuthenticated() && (isCEO() || (isAdmin() && getCompanyId() == companyId));
       allow create: if isAuthenticated(); 
+      allow delete: if isAuthenticated() && isCEO();
+    }
+
+    // Clients
+    match /clients/{clientId} {
+      allow read: if isAuthenticated() && (isCEO() || getCompanyId() == resource.data.company_id);
+      allow create: if isAuthenticated() && (isCEO() || getCompanyId() == request.resource.data.company_id);
+      allow update: if isAuthenticated() && (isCEO() || (getCompanyId() == resource.data.company_id && getCompanyId() == request.resource.data.company_id));
+      allow delete: if isAuthenticated() && (isCEO() || getCompanyId() == resource.data.company_id);
     }
 
     // Tasks: Filtered by company.
