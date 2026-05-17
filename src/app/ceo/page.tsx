@@ -14,7 +14,8 @@ import {
     User as UserIcon,
     StickyNote,
     ShieldCheck,
-    Search
+    Search,
+    Trash2
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useFirestoreQuery } from "@/hooks/useFirestoreQuery";
@@ -85,6 +86,20 @@ export default function SuperAdminCEOPage() {
             alert("Error: " + error.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteCompany = async (companyId: string, companyName: string) => {
+        if (confirm(`¿Estás seguro de que quieres eliminar la empresa "${companyName}" y todos sus datos asociados? Esta acción no se puede deshacer.`)) {
+            setLoading(true);
+            try {
+                await userActions.deleteCompany(companyId);
+                alert("Empresa eliminada con éxito.");
+            } catch (error: any) {
+                alert("Error al eliminar la empresa: " + error.message);
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -243,8 +258,17 @@ export default function SuperAdminCEOPage() {
                                             <button 
                                                 onClick={() => openEditCompany(c)}
                                                 style={{ padding: '4px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                                                title="Editar Empresa"
                                             >
                                                 <StickyNote size={14} />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteCompany(c.id, c.name)}
+                                                style={{ padding: '4px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}
+                                                title="Eliminar Empresa"
+                                                disabled={loading}
+                                            >
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                         <p className="text-small text-muted">ID: {c.id}</p>

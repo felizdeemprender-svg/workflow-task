@@ -50,6 +50,13 @@ export const userActions = {
         });
     },
 
+    deleteCompany: async (companyId: string) => {
+        const { doc, deleteDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase/config');
+        const companyRef = doc(db, 'companies', companyId);
+        await deleteDoc(companyRef);
+    },
+
     /**
      * Administrative user creation (Auth + Firestore) via Cloud Function.
      * Use this for both Admins (by CEO) and Employees (by Admins).
